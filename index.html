@@ -6,7 +6,8 @@
 <title>Energy Sentinel · Aula inteligente IoT</title>
 <meta name="description" content="Simulador y panel IoT de Energy Sentinel: detectar presencia, automatizar la iluminación y ahorrar energía en el aula. ODS 7.">
 <meta name="theme-color" content="#0a1120">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a1120'/%3E%3Cpath d='M18 4 8 18h7l-2 10 11-15h-7z' fill='%2345f0a0'/%3E%3C/svg%3E">
+<link rel="icon" href="logo/logo-icono.svg">
+<link rel="apple-touch-icon" href="logo/logo-icono.png">
 <style>
 :root{
   --bg:#0a1120; --panel:#111a2e; --panel2:#16213a; --line:#22304f; --txt:#e6edf7; --mut:#8a9bb8;
@@ -19,7 +20,8 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 input,select{font:inherit}
 .wrap{max-width:1280px;margin:0 auto;padding:16px 16px 40px}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 14px}
-.logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(140deg,#123,#0d2a22);display:grid;place-items:center;border:1px solid #1f4a3a}
+.logo{width:48px;height:48px;border-radius:12px;border:1px solid #1f3350}
+.logoGrande{display:block;width:100%;max-width:520px;margin:0 auto 14px;border-radius:16px}
 h1{font-size:20px;margin:0;letter-spacing:.06em}
 .lema{color:var(--verde);font-size:13px;letter-spacing:.12em;text-transform:uppercase}
 .ods{margin-left:auto;font-size:12px;color:var(--mut);border:1px solid var(--line);padding:6px 10px;border-radius:999px}
@@ -97,7 +99,7 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
 <body>
 <div class="wrap">
 <header>
-  <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="24"><path d="M18 4 8 18h7l-2 10 11-15h-7z" fill="#45f0a0"/></svg></div>
+  <img class="logo" src="logo/logo-icono.svg" alt="Logo de Energy Sentinel">
   <div>
     <h1>ENERGY SENTINEL</h1>
     <div class="lema">Detectar · Automatizar · Ahorrar</div>
@@ -268,6 +270,8 @@ Detectar.Ahorrar</div>
 </section>
 
 <section class="vista card txt" id="v-como" hidden>
+  <img class="logoGrande" src="logo/logo-completo.svg" alt="Energy Sentinel: Detectar, Automatizar, Ahorrar">
+  <p style="text-align:center"><a class="btn" href="logo/logo-completo.png" download>⬇ Descargar logo (PNG)</a> <a class="btn" href="logo/logo-icono.png" download>⬇ Descargar ícono (PNG)</a></p>
   <h2>Cómo funciona</h2>
   <h3>1 · Detectar</h3>
   <p>El sensor de movimiento PIR vigila el aula. Cuando alguien entra, envía la señal al Arduino UNO R4 WiFi, que es el cerebro del sistema. El sensor DHT11 mide la temperatura.</p>
