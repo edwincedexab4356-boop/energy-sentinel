@@ -51,6 +51,8 @@ svg{display:block;width:100%;height:auto}
 .ctrls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .btn{background:var(--panel2);border:1px solid #2c3f66;border-radius:10px;padding:9px 13px;transition:transform .12s, background .15s}
 .btn:active{transform:scale(.97)}
+a.btn{display:inline-block;color:var(--txt);text-decoration:none}
+a.btn.pri{color:#c9ffe6}
 .btn.pri{background:#173b2f;border-color:#2b7a5c;color:#c9ffe6}
 .btn.amb{background:#3b2f12;border-color:#7a6226;color:#ffe6b0}
 .btn[disabled]{opacity:.4;cursor:not-allowed}
@@ -271,7 +273,7 @@ Detectar.Ahorrar</div>
 
 <section class="vista card txt" id="v-como" hidden>
   <img class="logoGrande" src="logo/logo-completo.svg" alt="Energy Sentinel: Detectar, Automatizar, Ahorrar">
-  <p style="text-align:center"><a class="btn" href="logo/logo-completo.png" download>⬇ Descargar logo (PNG)</a> <a class="btn" href="logo/logo-icono.png" download>⬇ Descargar ícono (PNG)</a></p>
+  <p style="text-align:center;max-width:none;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn" href="logo/logo-completo.png" download>⬇ Descargar logo (PNG)</a> <a class="btn" href="logo/logo-icono.png" download>⬇ Descargar ícono (PNG)</a></p>
   <h2>Cómo funciona</h2>
   <h3>1 · Detectar</h3>
   <p>El sensor de movimiento PIR vigila el aula. Cuando alguien entra, envía la señal al Arduino UNO R4 WiFi, que es el cerebro del sistema. El sensor DHT11 mide la temperatura.</p>
