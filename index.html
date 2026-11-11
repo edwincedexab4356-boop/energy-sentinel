@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Energy Sentinel · Aula inteligente IoT</title>
+<meta name="description" content="Simulador y panel IoT de Energy Sentinel: detectar presencia, automatizar la iluminación y ahorrar energía en el aula. ODS 7.">
+<meta name="theme-color" content="#0a1120">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a1120'/%3E%3Cpath d='M18 4 8 18h7l-2 10 11-15h-7z' fill='%2345f0a0'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0a1120; --panel:#111a2e; --panel2:#16213a; --line:#22304f; --txt:#e6edf7; --mut:#8a9bb8;
+  --verde:#45f0a0; --ambar:#ffc044; --azul:#5aa8ff; --rojo:#ff6b6b;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+input,select{font:inherit}
+.wrap{max-width:1280px;margin:0 auto;padding:16px 16px 40px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 14px}
+.logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(140deg,#123,#0d2a22);display:grid;place-items:center;border:1px solid #1f4a3a}
+h1{font-size:20px;margin:0;letter-spacing:.06em}
+.lema{color:var(--verde);font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+.ods{margin-left:auto;font-size:12px;color:var(--mut);border:1px solid var(--line);padding:6px 10px;border-radius:999px}
+.ods b{color:var(--ambar)}
+.tabs{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+.tab{background:var(--panel);border:1px solid var(--line);padding:8px 14px;border-radius:10px;color:var(--mut)}
+.tab[aria-selected=true]{background:var(--panel2);color:var(--txt);border-color:#2f4777}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em;font-weight:600;display:flex;align-items:center;gap:8px}
+.card h2 .der{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500}
+svg{display:block;width:100%;height:auto}
+.aula{border-radius:10px;background:#0c1426}
+.persona{transition:transform 1.1s cubic-bezier(.4,.1,.2,1)}
+.bench{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-top:12px;background:#0c1426;border:1px dashed #2a3a5c;border-radius:10px;padding:10px}
+@media (max-width:600px){.bench{grid-template-columns:1fr}}
+.placa{background:#0b5a63;border:2px solid #0e7480;border-radius:6px;padding:6px 8px;font:600 11px var(--mono);color:#cfeff2;min-width:120px}
+.placa small{display:block;font-weight:400;opacity:.75}
+.leds{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.led{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+.led i{width:12px;height:12px;border-radius:50%;background:#2a3245;box-shadow:inset 0 -2px 3px #0006;transition:background .2s,box-shadow .2s}
+.led.on.v i{background:var(--verde);box-shadow:0 0 10px var(--verde)}
+.led.on.a i{background:var(--ambar);box-shadow:0 0 10px var(--ambar)}
+.led.on.z i{background:var(--azul);box-shadow:0 0 10px var(--azul)}
+.lcd{background:#1b3fbf;border:5px solid #12266e;border-radius:6px;padding:6px 8px;font:600 14px/1.25 var(--mono);color:#dfe9ff;white-space:pre;letter-spacing:.06em;text-shadow:0 0 4px #9fc0ff80;min-width:16ch}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{background:var(--panel2);border:1px solid #2c3f66;border-radius:10px;padding:9px 13px;transition:transform .12s, background .15s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:#173b2f;border-color:#2b7a5c;color:#c9ffe6}
+.btn.amb{background:#3b2f12;border-color:#7a6226;color:#ffe6b0}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+@media (hover:hover){.btn:hover:not([disabled]){background:#1c2a48}.btn.pri:hover{background:#1d4a3a}}
+.fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--mut)}
+.fila input[type=range]{flex:1;min-width:120px;accent-color:var(--verde)}
+.fila output{font-family:var(--mono);color:var(--txt);min-width:6ch}
+.seg{display:inline-flex;border:1px solid #2c3f66;border-radius:10px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 10px;color:var(--mut)}
+.seg button[aria-pressed=true]{background:#24365c;color:var(--txt)}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em}
+.kpi .v{font:600 22px/1.2 var(--mono);margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--mut);margin-top:2px}
+.estado-ocupada{color:var(--verde)} .estado-espera{color:var(--ambar)} .estado-vacia{color:var(--azul)}
+.big{grid-column:1/-1;display:flex;gap:14px;align-items:center}
+.big .v{font-size:28px}
+.anillo{width:64px;height:64px;flex:none}
+canvas{width:100%;height:150px;display:block}
+.leyenda{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px;flex-wrap:wrap}
+.leyenda i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.remoto{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.remoto .btn{padding:12px 6px;text-align:center}
+.remoto .btn[aria-pressed=true]{outline:2px solid var(--verde);outline-offset:1px}
+.log{font:12px/1.5 var(--mono);color:var(--mut);max-height:170px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding:2px 0;border-bottom:1px solid #1a2540}
+.log b{color:var(--txt);font-weight:500}
+.pill{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+.pill.ok{color:var(--verde);border-color:#2b7a5c}
+.pill.err{color:var(--rojo);border-color:#7a2b2b}
+.vista[hidden]{display:none!important}
+.txt p,.txt li{color:#c5d1e6;max-width:75ch}
+.txt h3{margin:18px 0 6px;font-size:16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left}
+th{color:var(--mut);font-weight:500}
+code,pre{font-family:var(--mono)}
+pre.codigo{background:#070c17;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;max-height:520px;font-size:12.5px;line-height:1.5;color:#cfe0ff}
+.campo{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.campo input{background:#0c1426;border:1px solid #2c3f66;border-radius:10px;padding:9px 12px;color:var(--txt);min-width:180px}
+footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
+@media (prefers-reduced-motion:reduce){.persona{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="24"><path d="M18 4 8 18h7l-2 10 11-15h-7z" fill="#45f0a0"/></svg></div>
+  <div>
+    <h1>ENERGY SENTINEL</h1>
+    <div class="lema">Detectar · Automatizar · Ahorrar</div>
+  </div>
+  <div class="ods"><b>ODS 7</b> · Energía asequible y no contaminante</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-vista="sim">Simulador y panel</button>
+  <button class="tab" role="tab" aria-selected="false" data-vista="real">Arduino real (IoT)</button>
+  <button class="tab" role="tab" aria-selected="false" data-vista="como">Cómo funciona</button>
+</nav>
+
+<section class="vista" id="v-sim">
+<div class="grid">
+  <!-- MAQUETA -->
+  <div class="card">
+    <h2>Maqueta del aula <span class="der"><span id="modoFuente" class="pill">Simulación</span> &nbsp;<span id="reloj" style="font-family:var(--mono);color:var(--txt)">07:00</span></span></h2>
+    <svg class="aula" viewBox="0 0 640 400" role="img" aria-label="Vista superior del aula con escritorios, luces, puerta y sensores">
+      <defs>
+        <radialGradient id="glow"><stop offset="0" stop-color="#fff6c8" stop-opacity=".95"/><stop offset=".35" stop-color="#ffe9a0" stop-opacity=".45"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/></radialGradient>
+        <clipPath id="recorte"><rect x="40" y="30" width="560" height="320"/></clipPath>
+        <pattern id="madera" width="40" height="12" patternUnits="userSpaceOnUse"><rect width="40" height="12" fill="#c9b08a"/><path d="M0 11.5h40M20 0v12" stroke="#b39770" stroke-width="1"/></pattern>
+      </defs>
+      <!-- piso -->
+      <rect x="40" y="30" width="560" height="320" fill="url(#madera)"/>
+      <!-- pizarra y escritorio del profe -->
+      <rect x="230" y="34" width="180" height="9" rx="2" fill="#24533f"/>
+      <rect x="285" y="62" width="70" height="26" rx="3" fill="#7a5532"/>
+      <!-- pupitres -->
+      <g id="pupitres"></g>
+      <!-- luces del techo -->
+      <g id="luces" clip-path="url(#recorte)"></g>
+      <!-- oscuridad -->
+      <rect id="oscuro" x="40" y="30" width="560" height="320" fill="#050914" opacity=".62" style="transition:opacity .5s"/>
+      <!-- cono del PIR -->
+      <path id="cono" d="M588 42 L330 350 L600 350 Z" fill="#45f0a0" opacity="0" style="transition:opacity .25s"/>
+      <!-- personas -->
+      <g id="personas"></g>
+      <!-- paredes -->
+      <g stroke="#e9eef7" stroke-width="8" stroke-linecap="square" fill="none">
+        <path d="M40 30 H600 V350"/>
+        <path d="M40 30 V240 M40 318 V350"/>
+      </g>
+      <path d="M40 350 H600" stroke="#e9eef7" stroke-width="3" stroke-dasharray="10 8" opacity=".55"/>
+      <text x="320" y="370" fill="#8a9bb8" font-size="11" text-anchor="middle">pared frontal abierta para ver el interior</text>
+      <!-- puerta -->
+      <g id="puerta" style="transform-origin:40px 240px;transition:transform .5s">
+        <rect x="36" y="240" width="8" height="78" fill="#8a5a2c"/>
+      </g>
+      <path d="M40 318 A78 78 0 0 0 118 240" fill="none" stroke="#e9eef7" stroke-width="1" stroke-dasharray="3 4" opacity=".5"/>
+      <text x="20" y="282" fill="#8a9bb8" font-size="11" text-anchor="middle" transform="rotate(-90 20 282)">PUERTA</text>
+      <!-- sensores -->
+      <g>
+        <circle cx="588" cy="42" r="9" fill="#f4f4f4" stroke="#999"/>
+        <circle id="pirLed" cx="588" cy="42" r="3.2" fill="#555"/>
+        <text x="572" y="62" fill="#e6edf7" font-size="10" text-anchor="end">PIR</text>
+      </g>
+      <g>
+        <rect x="590" y="176" width="14" height="22" rx="2" fill="#2b7bd6"/>
+        <text x="584" y="191" fill="#e6edf7" font-size="10" text-anchor="end">DHT11 <tspan id="tSvg">--</tspan></text>
+      </g>
+    </svg>
+
+    <div class="bench" aria-label="Electrónica de la maqueta">
+      <div class="placa">ARDUINO UNO R4 WiFi<small id="wifiTxt">WiFi · enviando datos</small></div>
+      <div class="leds">
+        <span class="led v" id="ledOcupada"><i></i>Ocupada</span>
+        <span class="led a" id="ledEspera"><i></i>Temporizador</span>
+        <span class="led z" id="ledAhorro"><i></i>Ahorro</span>
+      </div>
+      <div class="lcd" id="lcd" aria-live="polite">ENERGY SENTINEL
+Detectar.Ahorrar</div>
+    </div>
+
+    <div class="ctrls" id="ctrlSim">
+      <button class="btn pri" id="bEntra">+ Entra una persona</button>
+      <button class="btn" id="bSale">− Sale una persona</button>
+      <button class="btn" id="bVacia">Todos salen</button>
+      <button class="btn amb" id="bDia">▶ Simular un día de clases</button>
+      <button class="btn" id="bReset">Reiniciar</button>
+    </div>
+    <div class="fila">
+      <span>Apagar tras</span>
+      <input type="range" id="rTiempo" min="5" max="300" step="5" value="30" aria-label="Segundos sin presencia antes de apagar">
+      <output id="oTiempo">30 s</output>
+    </div>
+    <div class="fila">
+      <span>Velocidad</span>
+      <div class="seg" id="vel" role="group" aria-label="Velocidad de la simulación">
+        <button data-v="1" aria-pressed="true">×1</button><button data-v="10" aria-pressed="false">×10</button><button data-v="60" aria-pressed="false">×60</button><button data-v="180" aria-pressed="false">×180</button><button data-v="600" aria-pressed="false">×600</button>
+      </div>
+      <span style="margin-left:auto">Temp. exterior</span>
+      <input type="range" id="rTemp" min="22" max="36" step="0.5" value="29" style="max-width:120px" aria-label="Temperatura exterior">
+      <output id="oTemp">29 °C</output>
+    </div>
+  </div>
+
+  <!-- PANEL -->
+  <div style="display:grid;gap:14px;align-content:start">
+    <div class="card">
+      <h2>Panel de monitoreo <span class="der" id="ultima"></span></h2>
+      <div class="kpis">
+        <div class="kpi big">
+          <svg class="anillo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="#22304f" stroke-width="7"/><circle id="anillo" cx="32" cy="32" r="27" fill="none" stroke="#45f0a0" stroke-width="7" stroke-linecap="round" stroke-dasharray="0 170" transform="rotate(-90 32 32)"/></svg>
+          <div><div class="l">Energía ahorrada</div><div class="v" id="kAhorroPct">0 %</div><div class="s" id="kAhorroTxt">0 Wh ahorrados · $0.00</div></div>
+        </div>
+        <div class="kpi"><div class="l">Estado del aula</div><div class="v" id="kEstado">VACÍA</div><div class="s" id="kPersonas">0 personas</div></div>
+        <div class="kpi"><div class="l">Luces</div><div class="v" id="kLuces">APAGADAS</div><div class="s" id="kModo">Modo automático</div></div>
+        <div class="kpi"><div class="l">Temperatura</div><div class="v" id="kTemp">-- °C</div><div class="s" id="kTempS">sensor DHT11</div></div>
+        <div class="kpi"><div class="l">Tiempo de uso</div><div class="v" id="kUso">00:00:00</div><div class="s" id="kUsoS">aula ocupada</div></div>
+        <div class="kpi"><div class="l">Consumo real</div><div class="v" id="kCons">0 Wh</div><div class="s" id="kConsS">con Energy Sentinel</div></div>
+        <div class="kpi"><div class="l">Sin el sistema</div><div class="v" id="kSin">0 Wh</div><div class="s">luces encendidas toda la jornada</div></div>
+      </div>
+      <canvas id="graf" aria-label="Gráfica de consumo acumulado"></canvas>
+      <div class="leyenda"><span><i style="background:#8a9bb8"></i>Sin el sistema</span><span><i style="background:#45f0a0"></i>Con Energy Sentinel</span><span><i style="background:#ffc044"></i>Temperatura</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Control remoto <span class="der pill" id="remotoDestino">a la simulación</span></h2>
+      <div class="remoto" role="group" aria-label="Control remoto de luces">
+        <button class="btn" id="rOn" aria-pressed="false">💡 Encender</button>
+        <button class="btn" id="rOff" aria-pressed="false">🌙 Apagar</button>
+        <button class="btn" id="rAuto" aria-pressed="true">⚙ Automático</button>
+      </div>
+      <div class="fila"><span>Potencia del aula real</span><input type="number" id="iPot" value="144" min="10" max="2000" style="width:80px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"> <span>W</span><span style="margin-left:auto">Tarifa</span><input type="number" id="iTar" value="0.21" step="0.01" min="0" style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>$/kWh</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Registro de eventos</h2>
+      <ul class="log" id="log"></ul>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="vista card txt" id="v-real" hidden>
+  <h2>Conectar la maqueta real</h2>
+  <p>El Arduino UNO R4 WiFi envía sus datos por internet (MQTT) cada 2 segundos y este mismo panel los muestra. Los botones de <b>Control remoto</b> envían la orden al Arduino.</p>
+  <div class="campo">
+    <label for="iCodigo">Código del aula</label>
+    <input id="iCodigo" autocomplete="off" spellcheck="false">
+    <button class="btn pri" id="bConectar">Conectar</button>
+    <button class="btn" id="bDesconectar" disabled>Volver a simulación</button>
+    <span class="pill" id="estadoMqtt">desconectado</span>
+  </div>
+  <p style="font-size:13px;color:var(--mut)">Pon el mismo código en <code>CODIGO_AULA</code> del programa del Arduino. Usa un código difícil de adivinar: el servidor MQTT es público y gratuito.</p>
+  <h3>Pasos</h3>
+  <ol>
+    <li>Instala en el Arduino IDE las librerías <code>ArduinoMqttClient</code>, <code>DHT sensor library</code> (Adafruit) y <code>LiquidCrystal I2C</code>.</li>
+    <li>Descarga el programa, escribe el nombre y la clave del WiFi y el código del aula, y súbelo a la placa.</li>
+    <li>Abre este enlace en el celular o la computadora, escribe el código y pulsa <b>Conectar</b>. Vuelve a la pestaña “Simulador y panel”.</li>
+  </ol>
+  <div class="ctrls"><a class="btn pri" id="bDescargar" href="energy_sentinel.ino" download>⬇ Descargar programa .ino</a><button class="btn" id="bCopiar">Copiar código</button></div>
+  <h3>Conexiones</h3>
+  <table>
+    <tr><th>Componente</th><th>Pin del Arduino</th><th>Notas</th></tr>
+    <tr><td>Sensor PIR HC-SR501</td><td>OUT → D2</td><td>VCC 5V, GND</td></tr>
+    <tr><td>Sensor DHT11</td><td>DATA → D4</td><td>VCC 5V, GND</td></tr>
+    <tr><td>Luces LED del techo</td><td>D6</td><td>Con resistencia de 220 Ω; muchos LEDs → transistor o relé</td></tr>
+    <tr><td>LED verde (ocupada)</td><td>D8</td><td>220 Ω</td></tr>
+    <tr><td>LED amarillo (temporizador)</td><td>D9</td><td>220 Ω</td></tr>
+    <tr><td>LED azul (ahorro)</td><td>D10</td><td>220 Ω</td></tr>
+    <tr><td>LCD 16x2 I2C (0x27)</td><td>SDA, SCL</td><td>VCC 5V, GND</td></tr>
+  </table>
+  <h3>Programa</h3>
+  <pre class="codigo" id="codigo">Cargando…</pre>
+</section>
+
+<section class="vista card txt" id="v-como" hidden>
+  <h2>Cómo funciona</h2>
+  <h3>1 · Detectar</h3>
+  <p>El sensor de movimiento PIR vigila el aula. Cuando alguien entra, envía la señal al Arduino UNO R4 WiFi, que es el cerebro del sistema. El sensor DHT11 mide la temperatura.</p>
+  <h3>2 · Automatizar</h3>
+  <p>Con presencia, el Arduino enciende las luces LED del techo. Cuando el aula queda vacía empieza un temporizador (LED amarillo y cuenta atrás en la pantalla LCD). Si se cumple el tiempo sin detectar a nadie, el sistema entra en <b>modo ahorro</b> y apaga las luces (LED azul).</p>
+  <h3>3 · Ahorrar</h3>
+  <p>El Arduino cuenta cuánto tiempo estuvieron encendidas las luces y lo compara con un aula sin el sistema, donde las luces quedan prendidas toda la jornada. La jornada empieza cuando entra la primera persona. Así calcula la energía y el dinero ahorrados.</p>
+  <h3>IoT</h3>
+  <p>Por WiFi, el Arduino publica su estado en internet y este panel lo muestra en cualquier celular o computadora: estado del aula, luces, temperatura, tiempo de uso y energía. Desde el panel se pueden encender o apagar las luces a distancia o devolverlas al modo automático.</p>
+  <h3>Cálculo de energía</h3>
+  <p>Energía (Wh) = potencia de las luces (W) × horas encendidas. La maqueta usa LEDs pequeños; para que los números sean realistas se calcula con un aula real equivalente de 8 lámparas LED de 18 W (144 W). La potencia y la tarifa se pueden cambiar en el panel.</p>
+</section>
+
+<footer>Energy Sentinel · Proyecto escolar de robótica e IoT · ODS 7</footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+/* ---------- Dibujo del aula ---------- */
+const asientos = [];
+const gP = $('pupitres');
+[[150,140],[290,140],[430,140],[150,240],[290,240],[430,240]].forEach(([x,y]) => {
+  el('rect',{x,y,width:76,height:30,rx:3,fill:'#8b6a45',stroke:'#5e4429'},gP);
+  el('rect',{x:x+23,y:y+40,width:30,height:16,rx:4,fill:'#3d5a80'},gP);
+  asientos.push([x+38,y+48]);
+});
+asientos.push([320,100]); // profesor
+const lucesPos = [[190,118],[450,118],[190,222],[450,222]];
+const gL = $('luces'); const halos = [], tubos = [];
+lucesPos.forEach(([x,y]) => {
+  halos.push(el('circle',{cx:x,cy:y,r:150,fill:'url(#glow)',opacity:0,style:'transition:opacity .5s'},gL));
+  tubos.push(el('rect',{x:x-32,y:y-5,width:64,height:10,rx:5,fill:'#555c6b',stroke:'#2b3140',style:'transition:fill .3s'},gL));
+});
+const gPers = $('personas');
+const PUERTA = [70, 279], AFUERA = [-30, 279];
+const colores = ['#ff8a65','#ffd54f','#81c784','#64b5f6','#ba68c8','#f06292','#4dd0e1'];
+
+/* ---------- Estado ---------- */
+const S = {
+  t: 7*3600, personas: [], estado: 'VACIA', luces: false, manual: false,
+  ultMov: -1e9, tiempo: 30, uso: 0, consWh: 0, sinWh: 0, temp: 27.2, ext: 29,
+  vel: 1, pot: 144, tar: 0.21, dia: null, fuente: 'sim', restante: 0, activo: false
+};
+const hist = [];
+
+function fmtHora(s){ s = Math.floor(s) % 86400; return String(Math.floor(s/3600)).padStart(2,'0')+':'+String(Math.floor(s/60)%60).padStart(2,'0'); }
+function fmtDur(s){ s = Math.floor(s); return [Math.floor(s/3600), Math.floor(s/60)%60, s%60].map(n=>String(n).padStart(2,'0')).join(':'); }
+function fmtWh(wh){ return wh >= 1000 ? (wh/1000).toFixed(2)+' kWh' : wh.toFixed(wh < 10 ? 1 : 0)+' Wh'; }
+
+function log(msg){
+  const li = document.createElement('li');
+  li.innerHTML = '<b>'+fmtHora(S.t)+'</b> '+msg;
+  const ul = $('log'); ul.prepend(li);
+  while (ul.children.length > 60) ul.lastChild.remove();
+}
+
+/* ---------- Personas ---------- */
+function pulsoPIR(){ $('cono').setAttribute('opacity','.16'); $('pirLed').setAttribute('fill','#ff4d4d'); clearTimeout(pulsoPIR.t); pulsoPIR.t = setTimeout(()=>{ $('cono').setAttribute('opacity','0'); $('pirLed').setAttribute('fill','#555'); }, 700); }
+function abrirPuerta(){ $('puerta').style.transform='rotate(-80deg)'; clearTimeout(abrirPuerta.t); abrirPuerta.t=setTimeout(()=>$('puerta').style.transform='',1400); }
+function mover(g,[x,y]){ g.style.transform = `translate(${x}px,${y}px)`; }
+function entra(silencio){
+  if (S.fuente !== 'sim') return;
+  const libres = asientos.map((a,i)=>i).filter(i => !S.personas.some(p=>p.asiento===i));
+  if (!libres.length) { if(!silencio) log('El aula está llena'); return; }
+  const asiento = libres[0];
+  const g = el('g',{class:'persona'},gPers);
+  el('circle',{r:11,fill:colores[asiento%colores.length],stroke:'#1b1b1b','stroke-width':1.5},g);
+  el('circle',{r:5,cy:-1,fill:'#3b2a20'},g);
+  mover(g,AFUERA); g.getBoundingClientRect();
+  requestAnimationFrame(()=>{ mover(g,PUERTA); setTimeout(()=>mover(g,asientos[asiento]),550); });
+  S.personas.push({g,asiento});
+  abrirPuerta(); movimiento();
+  if(!silencio) log('Entra una persona ('+S.personas.length+' en el aula)');
+}
+function sale(silencio){
+  if (S.fuente !== 'sim' || !S.personas.length) return;
+  const p = S.personas.pop();
+  mover(p.g,PUERTA); setTimeout(()=>mover(p.g,AFUERA),550); setTimeout(()=>p.g.remove(),1700);
+  abrirPuerta(); movimiento();
+  if(!silencio) log('Sale una persona ('+S.personas.length+' en el aula)');
+}
+function movimiento(){ S.ultMov = S.t; pulsoPIR(); }
+function ajustarPersonas(n){ while (S.personas.length < n) entra(true); while (S.personas.length > n) sale(true); }
+
+/* ---------- Motor de simulación ---------- */
+function paso(dt){
+  S.t += dt;
+  // PIR: con gente en el aula siempre hay movimiento (pequeño margen)
+  if (S.personas.length) { S.ultMov = S.t; if (Math.random() < dt*0.15/Math.max(1,S.vel/10)) pulsoPIR(); }
+  const antes = S.estado;
+  if (S.personas.length) S.estado = 'OCUPADA';
+  else if (S.estado !== 'VACIA') S.estado = (S.t - S.ultMov < S.tiempo) ? 'ESPERA' : 'VACIA';
+  S.restante = S.estado === 'ESPERA' ? Math.ceil(S.tiempo - (S.t - S.ultMov)) : 0;
+  if (antes !== S.estado) {
+    if (S.estado === 'OCUPADA') log('PIR detecta presencia → aula <b>ocupada</b>');
+    if (S.estado === 'ESPERA') log('Aula vacía → temporizador de '+S.tiempo+' s');
+    if (S.estado === 'VACIA') log('Tiempo cumplido → <b>modo ahorro</b>');
+  }
+  if (!S.manual) {
+    const quiere = S.estado !== 'VACIA';
+    if (quiere !== S.luces) { S.luces = quiere; log('Luces '+(quiere?'<b>encendidas</b>':'<b>apagadas</b>')+' automáticamente'); }
+  }
+  if (S.estado !== 'VACIA') S.uso += dt;
+  if (S.luces) S.consWh += S.pot*dt/3600;
+  if (S.estado !== 'VACIA') S.activo = true;   // la jornada empieza con la primera persona
+  if (S.activo) S.sinWh += S.pot*dt/3600;
+  // temperatura: tiende al exterior + calor de las personas
+  const objetivo = S.ext - 1.5 + S.personas.length*0.35 + (S.luces?0.2:0);
+  S.temp += (objetivo - S.temp) * Math.min(1, dt/900) + (Math.random()-.5)*0.02*Math.min(dt,5);
+}
+
+/* Día de clases: [hora en minutos desde 07:00, personas] */
+const DIA = [[2,3],[6,6],[10,7],[150,0],[180,7],[300,0],[345,6],[450,2],[455,0],[510,0]];
+function iniciarDia(){
+  if (S.fuente !== 'sim') return;
+  reiniciar(true);
+  S.dia = 0; setVel(600);
+  log('▶ Empieza un día de clases simulado (07:00 a 15:30)');
+  $('bDia').textContent = '■ Detener el día';
+}
+function pararDia(fin){
+  if (S.dia === null) return;
+  S.dia = null; $('bDia').textContent = '▶ Simular un día de clases'; setVel(1);
+  if (fin) log('■ Fin del día: ahorro de <b>'+fmtWh(S.sinWh-S.consWh)+'</b> ('+pct()+' %)');
+}
+function avanzarDia(){
+  if (S.dia === null) return;
+  const min = (S.t - 7*3600)/60;
+  while (S.dia < DIA.length && DIA[S.dia][0] <= min) {
+    const n = DIA[S.dia][1];
+    const etiquetas = {150:'Recreo',180:'Vuelven del recreo',300:'Almuerzo',345:'Vuelven del almuerzo',450:'Termina la clase'};
+    if (etiquetas[DIA[S.dia][0]]) log(etiquetas[DIA[S.dia][0]]);
+    ajustarPersonas(n); S.dia++;
+  }
+  if (S.dia >= DIA.length) pararDia(true);
+}
+
+function reiniciar(silencio){
+  pararDia(false);
+  S.personas.forEach(p=>p.g.remove()); S.personas = [];
+  Object.assign(S,{t:7*3600,estado:'VACIA',luces:false,manual:false,activo:false,ultMov:-1e9,uso:0,consWh:0,sinWh:0,temp:S.ext-1.8,restante:0});
+  hist.length = 0; $('log').innerHTML = '';
+  if(!silencio) log('Sistema reiniciado');
+  marcarRemoto();
+}
+function pct(){ return S.sinWh > 0 ? Math.round((S.sinWh - S.consWh)/S.sinWh*100) : 0; }
+
+/* ---------- Pintar ---------- */
+function lcdTexto(){
+  const pad = s => (s+' '.repeat(16)).slice(0,16);
+  const est = {OCUPADA:'OCUPADA',ESPERA:'ESPERA',VACIA:'VACIA'}[S.estado];
+  const l1 = pad('AULA:'+(est+'       ').slice(0,7)+' '+(S.manual?'MAN':'AUT'));
+  let l2;
+  if (S.estado==='ESPERA' && !S.manual) l2 = 'APAGA EN '+String(S.restante).padStart(3,' ')+'s';
+  else if (!S.luces) l2 = 'MODO AHORRO';
+  else l2 = 'LUZ:ON  T:'+(S.temp==null?'--.-':S.temp.toFixed(1))+'C';
+  return l1+'\n'+pad(l2);
+}
+function pintar(){
+  const on = S.luces;
+  $('oscuro').setAttribute('opacity', on ? '0' : '.62');
+  halos.forEach(h=>h.setAttribute('opacity', on ? '1':'0'));
+  tubos.forEach(t=>t.setAttribute('fill', on ? '#fffbe0':'#555c6b'));
+  $('ledOcupada').classList.toggle('on', S.estado==='OCUPADA');
+  $('ledEspera').classList.toggle('on', S.estado==='ESPERA');
+  $('ledAhorro').classList.toggle('on', !on);
+  $('lcd').textContent = lcdTexto();
+  $('reloj').textContent = S.fuente==='sim' ? fmtHora(S.t) : new Date().toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
+  $('tSvg').textContent = S.temp==null ? '--' : S.temp.toFixed(1)+'°C';
+
+  const kE = $('kEstado');
+  kE.textContent = {OCUPADA:'OCUPADA',ESPERA:'EN ESPERA',VACIA:'DESOCUPADA'}[S.estado];
+  kE.className = 'v estado-'+S.estado.toLowerCase();
+  $('kPersonas').textContent = S.fuente==='sim' ? (S.personas.length+(S.personas.length===1?' persona':' personas')) + (S.estado==='ESPERA'?' · apaga en '+S.restante+' s':'') : (S.estado==='ESPERA'?'apaga en '+S.restante+' s':'sensor PIR');
+  $('kLuces').textContent = on ? 'ENCENDIDAS' : 'APAGADAS';
+  $('kLuces').style.color = on ? 'var(--ambar)' : 'var(--azul)';
+  $('kModo').textContent = S.manual ? 'Control manual (remoto)' : 'Modo automático';
+  $('kTemp').textContent = S.temp==null ? '-- °C' : S.temp.toFixed(1)+' °C';
+  $('kTempS').textContent = S.temp==null ? 'sin lectura' : (S.temp>=30?'aula calurosa':S.temp<=24?'aula fresca':'temperatura normal');
+  $('kUso').textContent = fmtDur(S.uso);
+  $('kCons').textContent = fmtWh(S.consWh);
+  $('kSin').textContent = fmtWh(S.sinWh);
+  const p = pct(), ah = Math.max(0,S.sinWh - S.consWh);
+  $('kAhorroPct').textContent = p+' %';
+  $('kAhorroTxt').textContent = fmtWh(ah)+' ahorrados · $'+(ah/1000*S.tar).toFixed(2);
+  $('anillo').setAttribute('stroke-dasharray', (Math.max(0,p)/100*169.6).toFixed(1)+' 170');
+  dibujarGraf();
+}
+
+const cv = $('graf'), cx = cv.getContext('2d');
+function dibujarGraf(){
+  const dpr = window.devicePixelRatio||1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w*dpr)) { cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  cx.setTransform(dpr,0,0,dpr,0,0); cx.clearRect(0,0,w,h);
+  cx.strokeStyle='#1d2944'; cx.lineWidth=1;
+  for (let i=1;i<4;i++){ cx.beginPath(); cx.moveTo(0,h*i/4+.5); cx.lineTo(w,h*i/4+.5); cx.stroke(); }
+  if (hist.length < 2) { cx.fillStyle='#8a9bb8'; cx.font='12px system-ui'; cx.fillText('La gráfica aparece cuando avanza el tiempo', 10, h/2); return; }
+  const t0 = hist[0].t, t1 = hist[hist.length-1].t || t0+1, maxE = Math.max(1, ...hist.map(p=>p.sin));
+  const X = t => (t-t0)/Math.max(1,t1-t0)*(w-4)+2, Y = v => h-6-(v/maxE)*(h-16);
+  const linea = (key,color,Yf) => { cx.beginPath(); hist.forEach((p,i)=>{ const y=Yf(p[key]); i?cx.lineTo(X(p.t),y):cx.moveTo(X(p.t),y); }); cx.strokeStyle=color; cx.lineWidth=2; cx.stroke(); };
+  // área de ahorro
+  cx.beginPath(); hist.forEach((p,i)=>{ i?cx.lineTo(X(p.t),Y(p.sin)):cx.moveTo(X(p.t),Y(p.sin)); });
+  for (let i=hist.length-1;i>=0;i--) cx.lineTo(X(hist[i].t),Y(hist[i].cons));
+  cx.closePath(); cx.fillStyle='rgba(69,240,160,.10)'; cx.fill();
+  linea('sin','#8a9bb8',Y); linea('cons','#45f0a0',Y);
+  const temps = hist.filter(p=>p.temp!=null).map(p=>p.temp);
+  if (temps.length>1){ const a=Math.min(...temps)-.5,b=Math.max(...temps)+.5; cx.setLineDash([4,4]); linea('temp','#ffc044',v=>v==null?h/2:h-6-(v-a)/(b-a)*(h-16)); cx.setLineDash([]); }
+  cx.fillStyle='#8a9bb8'; cx.font='11px system-ui'; cx.fillText(fmtWh(maxE),6,12);
+}
+
+/* ---------- Bucle ---------- */
+let ultimo = performance.now(), acumHist = 0, acumPint = 0;
+function bucle(ahora){
+  const dtReal = Math.min(0.25,(ahora-ultimo)/1000); ultimo = ahora;
+  if (S.fuente === 'sim') {
+    let dt = dtReal*S.vel;
+    while (dt > 0) { const d = Math.min(dt, 1); paso(d); avanzarDia(); dt -= d; }
+    acumHist += dtReal;
+    if (acumHist >= 0.5) { acumHist = 0; hist.push({t:S.t,sin:S.sinWh,cons:S.consWh,temp:S.temp}); if (hist.length>400) hist.splice(0,hist.length-400); }
+  }
+  acumPint += dtReal;
+  if (acumPint >= 0.1) { acumPint = 0; pintar(); }
+  requestAnimationFrame(bucle);
+}
+
+/* ---------- Controles ---------- */
+function setVel(v){ S.vel = v; document.querySelectorAll('#vel button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.v===v))); }
+$('bEntra').onclick = ()=>entra();
+$('bSale').onclick = ()=>sale();
+$('bVacia').onclick = ()=>{ if(S.personas.length){ log('Todos salen del aula'); ajustarPersonas(0);} };
+$('bDia').onclick = ()=> S.dia===null ? iniciarDia() : pararDia(false);
+$('bReset').onclick = ()=>reiniciar();
+document.querySelectorAll('#vel button').forEach(b=>b.onclick=()=>setVel(+b.dataset.v));
+$('rTiempo').oninput = e => { S.tiempo = +e.target.value; $('oTiempo').textContent = S.tiempo+' s'; if (S.fuente==='mqtt') enviar('TIEMPO:'+S.tiempo); };
+$('rTemp').oninput = e => { S.ext = +e.target.value; $('oTemp').textContent = S.ext+' °C'; };
+$('iPot').oninput = e => { const v=+e.target.value; if(v>0) S.pot=v; };
+$('iTar').oninput = e => { const v=+e.target.value; if(v>=0) S.tar=v; };
+
+function marcarRemoto(){
+  $('rOn').setAttribute('aria-pressed', String(S.manual && S.luces));
+  $('rOff').setAttribute('aria-pressed', String(S.manual && !S.luces));
+  $('rAuto').setAttribute('aria-pressed', String(!S.manual));
+}
+function remoto(cmd){
+  if (S.fuente === 'mqtt') { enviar(cmd); log('Orden remota enviada al Arduino: <b>'+cmd+'</b>'); return; }
+  if (cmd==='LUZ_ON'){ S.manual=true; S.luces=true; log('📱 Orden remota: luces <b>encendidas</b>'); }
+  if (cmd==='LUZ_OFF'){ S.manual=true; S.luces=false; log('📱 Orden remota: luces <b>apagadas</b>'); }
+  if (cmd==='AUTO'){ S.manual=false; log('📱 Orden remota: vuelve al <b>modo automático</b>'); }
+  marcarRemoto(); pintar();
+}
+$('rOn').onclick = ()=>remoto('LUZ_ON');
+$('rOff').onclick = ()=>remoto('LUZ_OFF');
+$('rAuto').onclick = ()=>remoto('AUTO');
+
+/* ---------- Pestañas ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected', String(x===t)));
+  document.querySelectorAll('.vista').forEach(v=>v.hidden = v.id !== 'v-'+t.dataset.vista);
+  if (t.dataset.vista==='sim') pintar();
+});
+
+/* ---------- Programa Arduino ---------- */
+let codigoIno = '';
+fetch('energy_sentinel.ino').then(r=>r.ok?r.text():Promise.reject()).then(t=>{ codigoIno=t; mostrarCodigo(); }).catch(()=>{ $('codigo').textContent='No se pudo cargar el programa. Descárgalo con el botón.'; });
+function mostrarCodigo(){
+  if (!codigoIno) return;
+  const c = codigoConCodigo();
+  $('codigo').textContent = c;
+  const url = URL.createObjectURL(new Blob([c],{type:'text/plain'}));
+  const a = $('bDescargar'); if (a.dataset.url) URL.revokeObjectURL(a.dataset.url); a.dataset.url = url; a.href = url;
+}
+function codigoConCodigo(){ return codigoIno.replace(/const char CODIGO_AULA\[\] = "[^"]*";/, 'const char CODIGO_AULA[] = "'+$('iCodigo').value.trim()+'";'); }
+$('bCopiar').onclick = async ()=>{ try{ await navigator.clipboard.writeText(codigoConCodigo()); $('bCopiar').textContent='¡Copiado!'; }catch{ $('bCopiar').textContent='Selecciona y copia'; } setTimeout(()=>$('bCopiar').textContent='Copiar código',1800); };
+
+/* ---------- MQTT (Arduino real) ---------- */
+const guardado = localStorage.getItem('es-codigo');
+$('iCodigo').value = guardado || ('aula-'+Math.random().toString(36).slice(2,8));
+$('iCodigo').oninput = ()=>{ localStorage.setItem('es-codigo',$('iCodigo').value.trim()); mostrarCodigo(); };
+let cliente = null, tema = '', ultimoMsg = 0;
+function cargarMqtt(){ return window.mqtt ? Promise.resolve() : new Promise((ok,mal)=>{ const s=document.createElement('script'); s.src='https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'; s.onload=ok; s.onerror=mal; document.head.appendChild(s); }); }
+function setMqtt(txt, cls){ const p=$('estadoMqtt'); p.textContent=txt; p.className='pill '+(cls||''); }
+async function conectar(){
+  const codigo = $('iCodigo').value.trim();
+  if (!/^[\w-]{4,40}$/.test(codigo)) { setMqtt('código no válido','err'); return; }
+  setMqtt('conectando…');
+  try { await cargarMqtt(); } catch { setMqtt('sin internet','err'); return; }
+  if (cliente) cliente.end(true);
+  tema = 'energysentinel/'+codigo;
+  cliente = mqtt.connect('wss://broker.hivemq.com:8884/mqtt',{clientId:'panel-'+Math.random().toString(16).slice(2,10), reconnectPeriod:3000, connectTimeout:8000});
+  cliente.on('connect',()=>{ cliente.subscribe(tema+'/estado'); setMqtt('conectado · esperando al Arduino','ok'); });
+  cliente.on('error',()=>setMqtt('error de conexión','err'));
+  cliente.on('offline',()=>setMqtt('sin conexión','err'));
+  cliente.on('message',(t,m)=>{ try{ recibir(JSON.parse(m.toString())); }catch{} });
+  pararDia(false);
+  S.fuente = 'mqtt';
+  S.personas.forEach(p=>p.g.remove()); S.personas=[];
+  S.temp = null; hist.length = 0;
+  $('modoFuente').textContent='Arduino real'; $('modoFuente').className='pill ok';
+  $('remotoDestino').textContent='al Arduino';
+  $('wifiTxt').textContent='esperando datos…';
+  document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=true);
+  $('bDesconectar').disabled=false; $('bConectar').textContent='Reconectar';
+  log('Conectando con el Arduino del aula <b>'+codigo+'</b>');
+}
+function desconectar(){
+  if (cliente) { cliente.end(true); cliente=null; }
+  S.fuente='sim'; setMqtt('desconectado');
+  $('modoFuente').textContent='Simulación'; $('modoFuente').className='pill';
+  $('remotoDestino').textContent='a la simulación'; $('wifiTxt').textContent='WiFi · enviando datos'; $('ultima').textContent='';
+  document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=false);
+  $('bDesconectar').disabled=true; $('bConectar').textContent='Conectar';
+  reiniciar(true); log('De vuelta a la simulación');
+}
+function enviar(cmd){ if (cliente && cliente.connected) cliente.publish(tema+'/cmd', cmd); }
+let personaReal = null;
+function recibir(d){
+  ultimoMsg = Date.now();
+  setMqtt('recibiendo datos del Arduino','ok'); $('wifiTxt').textContent='WiFi · en línea';
+  const antes = S.estado, lucesAntes = S.luces;
+  S.estado = ['OCUPADA','ESPERA','VACIA'].includes(d.estado) ? d.estado : 'VACIA';
+  S.luces = !!d.luces; S.manual = d.modo === 'MANUAL';
+  S.temp = typeof d.temp === 'number' ? d.temp : null;
+  S.restante = d.restante|0; S.uso = d.usoSeg||0; S.consWh = d.consumoWh||0; S.sinWh = d.sinSistemaWh||0;
+  if (d.potencia) S.pot = d.potencia;
+  if (d.tiempo && document.activeElement !== $('rTiempo')) { S.tiempo = d.tiempo; $('rTiempo').value = d.tiempo; $('oTiempo').textContent = d.tiempo+' s'; }
+  if (antes !== S.estado) { log('Arduino: aula <b>'+S.estado.toLowerCase()+'</b>'); if (S.estado==='OCUPADA') pulsoPIR(); }
+  if (lucesAntes !== S.luces) log('Arduino: luces <b>'+(S.luces?'encendidas':'apagadas')+'</b>');
+  // una figura representa la presencia detectada
+  if (S.estado==='OCUPADA' && !personaReal) { personaReal = el('g',{class:'persona'},gPers); el('circle',{r:11,fill:'#81c784',stroke:'#1b1b1b','stroke-width':1.5},personaReal); el('circle',{r:5,cy:-1,fill:'#3b2a20'},personaReal); mover(personaReal,AFUERA); personaReal.getBoundingClientRect(); requestAnimationFrame(()=>mover(personaReal,[328,200])); abrirPuerta(); }
+  if (S.estado!=='OCUPADA' && personaReal) { const g=personaReal; personaReal=null; mover(g,AFUERA); abrirPuerta(); setTimeout(()=>g.remove(),1200); }
+  S.t = Date.now()/1000;
+  hist.push({t:S.t,sin:S.sinWh,cons:S.consWh,temp:S.temp}); if (hist.length>400) hist.shift();
+  marcarRemoto(); pintar();
+}
+setInterval(()=>{ if (S.fuente==='mqtt' && ultimoMsg) { const s=Math.round((Date.now()-ultimoMsg)/1000); $('ultima').textContent = s<5 ? 'en vivo' : 'último dato hace '+s+' s'; if (s>10) { $('wifiTxt').textContent='sin datos del Arduino'; } } }, 1000);
+$('bConectar').onclick = conectar;
+$('bDesconectar').onclick = desconectar;
+
+/* ---------- Arranque ---------- */
+reiniciar(true);
+log('Sistema listo. Pulsa “Entra una persona” o “Simular un día de clases”.');
+requestAnimationFrame(bucle);
+})();
+</script>
+</body>
+</html>
