@@ -1,0 +1,3 @@
+# Datos privados (WiFi)
+firmware/EnergySentinel/arduino_secrets.h
+build/

@@ -107,6 +107,7 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
     <div class="lema">Detectar · Automatizar · Ahorrar</div>
   </div>
   <div class="ods"><b>ODS 7</b> · Energía asequible y no contaminante</div>
+  <button class="btn pri" id="bUsb">🔌 Conectar Arduino (USB)</button>
 </header>
 
 <nav class="tabs" role="tablist">
@@ -240,39 +241,50 @@ Detectar.Ahorrar</div>
 
 <section class="vista card txt" id="v-real" hidden>
   <h2>Conectar la maqueta real</h2>
-  <p>El Arduino UNO R4 WiFi envía sus datos por internet (MQTT) cada 2 segundos y este mismo panel los muestra. Los botones de <b>Control remoto</b> envían la orden al Arduino.</p>
+  <p>El Arduino UNO R4 WiFi se puede controlar de tres formas. En todas, el panel de la pestaña <b>Simulador y panel</b> muestra los datos reales y los botones de <b>Control remoto</b> mandan la orden al Arduino.</p>
+
+  <h3>1 · Por cable USB (computadora)</h3>
+  <p>Conecta el Arduino a la computadora, abre esta página en <b>Google Chrome o Microsoft Edge</b> y pulsa el botón. Elige el puerto “Arduino UNO R4 WiFi”. Cierra antes el Monitor Serie del Arduino IDE: solo un programa puede usar el puerto a la vez.</p>
+  <div class="campo"><button class="btn pri" id="bUsb2">🔌 Conectar Arduino (USB)</button><span class="pill" id="estadoUsb">desconectado</span></div>
+
+  <h3>2 · Por la red WiFi del Arduino (celular)</h3>
+  <p>El Arduino crea su propia red WiFi <b>EnergySentinel</b> (clave <code>aula12345</code>). Conéctate a ella desde el celular y abre <b>http://192.168.4.1</b>: ahí hay un panel con los mismos botones.</p>
+
+  <h3>3 · Por internet (desde cualquier lugar)</h3>
+  <p>Solo funciona si pones el nombre y la clave del WiFi de tu casa o colegio en <code>arduino_secrets.h</code>. Escribe aquí el mismo <code>SECRET_CODIGO_AULA</code> y pulsa <b>Conectar</b>.</p>
   <div class="campo">
     <label for="iCodigo">Código del aula</label>
     <input id="iCodigo" autocomplete="off" spellcheck="false">
     <button class="btn pri" id="bConectar">Conectar</button>
-    <button class="btn" id="bDesconectar" disabled>Volver a simulación</button>
     <span class="pill" id="estadoMqtt">desconectado</span>
   </div>
-  <p style="font-size:13px;color:var(--mut)">Pon el mismo código en <code>CODIGO_AULA</code> del programa del Arduino. Usa un código difícil de adivinar: el servidor MQTT es público y gratuito.</p>
-  <h3>Pasos</h3>
+  <p style="font-size:13px;color:var(--mut)">Usa un código difícil de adivinar: el servidor MQTT es público y gratuito.</p>
+  <div class="ctrls"><button class="btn" id="bDesconectar" disabled>Volver a simulación</button></div>
+
+  <h3>Subir el programa al Arduino</h3>
   <ol>
-    <li>Instala en el Arduino IDE las librerías <code>ArduinoMqttClient</code>, <code>DHT sensor library</code> (Adafruit) y <code>LiquidCrystal I2C</code>.</li>
-    <li>Descarga el programa, escribe el nombre y la clave del WiFi y el código del aula, y súbelo a la placa.</li>
-    <li>Abre este enlace en el celular o la computadora, escribe el código y pulsa <b>Conectar</b>. Vuelve a la pestaña “Simulador y panel”.</li>
+    <li>En el Arduino IDE instala la librería <code>ArduinoMqttClient</code> (Gestor de librerías). El DHT11 y la pantalla LCD no necesitan librerías.</li>
+    <li>Descarga el programa. Si quieres usar internet, pon tu WiFi en <code>SECRET_SSID</code> y <code>SECRET_PASS</code> (arriba del programa).</li>
+    <li>Placa: <b>Arduino UNO R4 WiFi</b> → Subir.</li>
   </ol>
-  <div class="ctrls"><a class="btn pri" id="bDescargar" href="energy_sentinel.ino" download>⬇ Descargar programa .ino</a><button class="btn" id="bCopiar">Copiar código</button></div>
+  <div class="ctrls"><a class="btn pri" id="bDescargar" href="firmware/EnergySentinel/EnergySentinel.ino" download="EnergySentinel.ino">⬇ Descargar programa .ino</a><button class="btn" id="bCopiar">Copiar código</button></div>
   <h3>Conexiones</h3>
   <table>
-    <tr><th>Componente</th><th>Pin del Arduino</th><th>Notas</th></tr>
-    <tr><td>Sensor PIR HC-SR501</td><td>OUT → D2</td><td>VCC 5V, GND</td></tr>
-    <tr><td>Sensor DHT11</td><td>DATA → D4</td><td>VCC 5V, GND</td></tr>
-    <tr><td>Luces LED del techo</td><td>D6</td><td>Con resistencia de 220 Ω; muchos LEDs → transistor o relé</td></tr>
-    <tr><td>LED verde (ocupada)</td><td>D8</td><td>220 Ω</td></tr>
-    <tr><td>LED amarillo (temporizador)</td><td>D9</td><td>220 Ω</td></tr>
-    <tr><td>LED azul (ahorro)</td><td>D10</td><td>220 Ω</td></tr>
-    <tr><td>LCD 16x2 I2C (0x27)</td><td>SDA, SCL</td><td>VCC 5V, GND</td></tr>
+    <tr><th>Componente</th><th>Pines del módulo</th><th>Arduino</th><th>Notas</th></tr>
+    <tr><td>Sensor PIR HC-SR501</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Tarda ~30 s en activarse al encender</td></tr>
+    <tr><td>Sensor DHT11</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Temperatura y humedad</td></tr>
+    <tr><td>Luces LED del techo</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 220 Ω; muchos LEDs o lámpara → módulo relé</td></tr>
+    <tr><td>LED verde (ocupada)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LED amarillo (temporizador)</td><td>+ / −</td><td><b>D9</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LED azul (ahorro)</td><td>+ / −</td><td><b>D10</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LCD 16x2 I2C</td><td>VCC / GND / SDA / SCL</td><td>5V / GND / <b>SDA</b> / <b>SCL</b></td><td>Dirección 0x27 o 0x3F: se detecta sola</td></tr>
   </table>
   <h3>Programa</h3>
   <pre class="codigo" id="codigo">Cargando…</pre>
 </section>
 
 <section class="vista card txt" id="v-como" hidden>
-  <img class="logoGrande" src="logo/logo-completo.svg" alt="Energy Sentinel: Detectar, Automatizar, Ahorrar">
+  <img class="logoGrande" src="logo/logo-completo.svg" alt="Energy Sentinel, aula inteligente IoT: Detectar, Automatizar, Ahorrar">
   <p style="text-align:center;max-width:none;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn" href="logo/logo-completo.png" download>⬇ Descargar logo (PNG)</a> <a class="btn" href="logo/logo-icono.png" download>⬇ Descargar ícono (PNG)</a></p>
   <h2>Cómo funciona</h2>
   <h3>1 · Detectar</h3>
@@ -287,7 +299,7 @@ Detectar.Ahorrar</div>
   <p>Energía (Wh) = potencia de las luces (W) × horas encendidas. La maqueta usa LEDs pequeños; para que los números sean realistas se calcula con un aula real equivalente de 8 lámparas LED de 18 W (144 W). La potencia y la tarifa se pueden cambiar en el panel.</p>
 </section>
 
-<footer>Energy Sentinel · Proyecto escolar de robótica e IoT · ODS 7</footer>
+<footer>Energy Sentinel · Aula inteligente IoT · Proyecto escolar de robótica · ODS 7 · <a href="https://github.com/edwincedexab4356-boop/energy-sentinel" style="color:var(--mut)">código en GitHub</a></footer>
 </div>
 
 <script>
@@ -417,6 +429,7 @@ function avanzarDia(){
 }
 
 function reiniciar(silencio){
+  if (S.fuente !== 'sim' && !silencio) { enviar('REINICIAR'); log('Orden: reiniciar contadores'); return; }
   pararDia(false);
   S.personas.forEach(p=>p.g.remove()); S.personas = [];
   Object.assign(S,{t:7*3600,estado:'VACIA',luces:false,manual:false,activo:false,ultMov:-1e9,uso:0,consWh:0,sinWh:0,temp:S.ext-1.8,restante:0});
@@ -428,6 +441,7 @@ function pct(){ return S.sinWh > 0 ? Math.round((S.sinWh - S.consWh)/S.sinWh*100
 
 /* ---------- Pintar ---------- */
 function lcdTexto(){
+  if (S.fuente !== 'sim' && S.lcd1 != null) return S.lcd1+'\n'+S.lcd2;
   const pad = s => (s+' '.repeat(16)).slice(0,16);
   const est = {OCUPADA:'OCUPADA',ESPERA:'ESPERA',VACIA:'VACIA'}[S.estado];
   const l1 = pad('AULA:'+(est+'       ').slice(0,7)+' '+(S.manual?'MAN':'AUT'));
@@ -457,7 +471,7 @@ function pintar(){
   $('kLuces').style.color = on ? 'var(--ambar)' : 'var(--azul)';
   $('kModo').textContent = S.manual ? 'Control manual (remoto)' : 'Modo automático';
   $('kTemp').textContent = S.temp==null ? '-- °C' : S.temp.toFixed(1)+' °C';
-  $('kTempS').textContent = S.temp==null ? 'sin lectura' : (S.temp>=30?'aula calurosa':S.temp<=24?'aula fresca':'temperatura normal');
+  $('kTempS').textContent = S.temp==null ? 'sin lectura' : (S.hum!=null?'humedad '+S.hum+' % · ':'')+ (S.temp>=30?'aula calurosa':S.temp<=24?'aula fresca':'temperatura normal');
   $('kUso').textContent = fmtDur(S.uso);
   $('kCons').textContent = fmtWh(S.consWh);
   $('kSin').textContent = fmtWh(S.sinWh);
@@ -511,8 +525,9 @@ $('bSale').onclick = ()=>sale();
 $('bVacia').onclick = ()=>{ if(S.personas.length){ log('Todos salen del aula'); ajustarPersonas(0);} };
 $('bDia').onclick = ()=> S.dia===null ? iniciarDia() : pararDia(false);
 $('bReset').onclick = ()=>reiniciar();
+$('iPot').onchange = ()=>{ if (S.fuente!=='sim') enviar('POTENCIA '+S.pot); };
 document.querySelectorAll('#vel button').forEach(b=>b.onclick=()=>setVel(+b.dataset.v));
-$('rTiempo').oninput = e => { S.tiempo = +e.target.value; $('oTiempo').textContent = S.tiempo+' s'; if (S.fuente==='mqtt') enviar('TIEMPO:'+S.tiempo); };
+$('rTiempo').oninput = e => { S.tiempo = +e.target.value; $('oTiempo').textContent = S.tiempo+' s'; if (S.fuente!=='sim') enviar('TIEMPO '+S.tiempo); };
 $('rTemp').oninput = e => { S.ext = +e.target.value; $('oTemp').textContent = S.ext+' °C'; };
 $('iPot').oninput = e => { const v=+e.target.value; if(v>0) S.pot=v; };
 $('iTar').oninput = e => { const v=+e.target.value; if(v>=0) S.tar=v; };
@@ -523,7 +538,7 @@ function marcarRemoto(){
   $('rAuto').setAttribute('aria-pressed', String(!S.manual));
 }
 function remoto(cmd){
-  if (S.fuente === 'mqtt') { enviar(cmd); log('Orden remota enviada al Arduino: <b>'+cmd+'</b>'); return; }
+  if (S.fuente !== 'sim') { enviar(cmd); log('Orden remota enviada al Arduino: <b>'+cmd+'</b>'); return; }
   if (cmd==='LUZ_ON'){ S.manual=true; S.luces=true; log('📱 Orden remota: luces <b>encendidas</b>'); }
   if (cmd==='LUZ_OFF'){ S.manual=true; S.luces=false; log('📱 Orden remota: luces <b>apagadas</b>'); }
   if (cmd==='AUTO'){ S.manual=false; log('📱 Orden remota: vuelve al <b>modo automático</b>'); }
@@ -542,7 +557,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
 
 /* ---------- Programa Arduino ---------- */
 let codigoIno = '';
-fetch('energy_sentinel.ino').then(r=>r.ok?r.text():Promise.reject()).then(t=>{ codigoIno=t; mostrarCodigo(); }).catch(()=>{ $('codigo').textContent='No se pudo cargar el programa. Descárgalo con el botón.'; });
+fetch('firmware/EnergySentinel/EnergySentinel.ino').then(r=>r.ok?r.text():Promise.reject()).then(t=>{ codigoIno=t; mostrarCodigo(); }).catch(()=>{ $('codigo').textContent='No se pudo cargar el programa. Descárgalo con el botón.'; });
 function mostrarCodigo(){
   if (!codigoIno) return;
   const c = codigoConCodigo();
@@ -550,7 +565,7 @@ function mostrarCodigo(){
   const url = URL.createObjectURL(new Blob([c],{type:'text/plain'}));
   const a = $('bDescargar'); if (a.dataset.url) URL.revokeObjectURL(a.dataset.url); a.dataset.url = url; a.href = url;
 }
-function codigoConCodigo(){ return codigoIno.replace(/const char CODIGO_AULA\[\] = "[^"]*";/, 'const char CODIGO_AULA[] = "'+$('iCodigo').value.trim()+'";'); }
+function codigoConCodigo(){ return codigoIno.replace(/#define SECRET_CODIGO_AULA "[^"]*"/, '#define SECRET_CODIGO_AULA "'+$('iCodigo').value.trim()+'"'); }
 $('bCopiar').onclick = async ()=>{ try{ await navigator.clipboard.writeText(codigoConCodigo()); $('bCopiar').textContent='¡Copiado!'; }catch{ $('bCopiar').textContent='Selecciona y copia'; } setTimeout(()=>$('bCopiar').textContent='Copiar código',1800); };
 
 /* ---------- MQTT (Arduino real) ---------- */
@@ -572,35 +587,102 @@ async function conectar(){
   cliente.on('error',()=>setMqtt('error de conexión','err'));
   cliente.on('offline',()=>setMqtt('sin conexión','err'));
   cliente.on('message',(t,m)=>{ try{ recibir(JSON.parse(m.toString())); }catch{} });
-  pararDia(false);
-  S.fuente = 'mqtt';
-  S.personas.forEach(p=>p.g.remove()); S.personas=[];
-  S.temp = null; hist.length = 0;
-  $('modoFuente').textContent='Arduino real'; $('modoFuente').className='pill ok';
-  $('remotoDestino').textContent='al Arduino';
-  $('wifiTxt').textContent='esperando datos…';
-  document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=true);
-  $('bDesconectar').disabled=false; $('bConectar').textContent='Reconectar';
+  if (S.fuente==='usb') { await cerrarUsb(); setUsb('desconectado'); }
+  modoReal('mqtt','Arduino real · internet');
+  $('bConectar').textContent='Reconectar';
   log('Conectando con el Arduino del aula <b>'+codigo+'</b>');
 }
-function desconectar(){
+function modoReal(fuente, etiqueta){
+  pararDia(false);
+  S.fuente = fuente; ultimoMsg = 0;
+  S.personas.forEach(p=>p.g.remove()); S.personas=[];
+  S.temp = null; S.hum = null; S.lcd1 = null; hist.length = 0;
+  $('modoFuente').textContent=etiqueta; $('modoFuente').className='pill ok';
+  $('remotoDestino').textContent='al Arduino';
+  $('wifiTxt').textContent='esperando datos…';
+  document.querySelectorAll('#ctrlSim button:not(#bReset), #vel button').forEach(b=>b.disabled=true);
+  $('bDesconectar').disabled=false;
+}
+async function desconectar(){
   if (cliente) { cliente.end(true); cliente=null; }
-  S.fuente='sim'; setMqtt('desconectado');
+  const eraUsb = S.fuente==='usb';
+  S.fuente='sim';
+  if (eraUsb) await cerrarUsb();
+  setMqtt('desconectado'); setUsb('desconectado');
   $('modoFuente').textContent='Simulación'; $('modoFuente').className='pill';
   $('remotoDestino').textContent='a la simulación'; $('wifiTxt').textContent='WiFi · enviando datos'; $('ultima').textContent='';
   document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=false);
   $('bDesconectar').disabled=true; $('bConectar').textContent='Conectar';
   reiniciar(true); log('De vuelta a la simulación');
 }
-function enviar(cmd){ if (cliente && cliente.connected) cliente.publish(tema+'/cmd', cmd); }
+function enviar(cmd){
+  if (S.fuente==='usb') { if (escritor) escritor.write(cmd+'\n').catch(()=>{}); return; }
+  if (cliente && cliente.connected) cliente.publish(tema+'/cmd', cmd);
+}
+
+/* ---------- USB (Web Serial) ---------- */
+let puerto = null, escritor = null, lectorUsb = null;
+function setUsb(txt, cls){
+  const p=$('estadoUsb'); p.textContent=txt; p.className='pill '+(cls||'');
+  const t = S.fuente==='usb' ? '⏏ Desconectar Arduino' : '🔌 Conectar Arduino (USB)';
+  $('bUsb').textContent = t; $('bUsb2').textContent = t;
+}
+async function conectarUsb(){
+  if (S.fuente==='usb') { desconectar(); return; }
+  if (!('serial' in navigator)) { alert('Tu navegador no permite conectar por USB. Usa Google Chrome o Microsoft Edge en una computadora.'); return; }
+  try {
+    puerto = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x2341 }] });
+    await puerto.open({ baudRate: 115200 });
+  } catch (e) { puerto = null; setUsb('no se pudo abrir el puerto','err'); log('USB: '+e.message); return; }
+  if (cliente) { cliente.end(true); cliente=null; setMqtt('desconectado'); }
+  const enc = new TextEncoderStream(); enc.readable.pipeTo(puerto.writable).catch(()=>{});
+  escritor = enc.writable.getWriter();
+  modoReal('usb','Arduino real · USB');
+  setUsb('conectado por USB','ok');
+  log('Conectado al Arduino por <b>USB</b>');
+  leerUsb(puerto);
+}
+async function leerUsb(p){
+  const dec = new TextDecoderStream(); p.readable.pipeTo(dec.writable).catch(()=>{});
+  const lector = dec.readable.getReader(); lectorUsb = lector;
+  let buf = '';
+  try {
+    while (true) {
+      const { value, done } = await lector.read();
+      if (done) break;
+      buf += value; let i;
+      while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0,i).trim(); buf = buf.slice(i+1); lineaUsb(l); }
+    }
+  } catch (e) {}
+  if (S.fuente==='usb' && puerto===p) { log('Conexión USB perdida'); desconectar(); }
+}
+function lineaUsb(l){
+  if (!l.startsWith('{')) return;
+  let j; try { j = JSON.parse(l); } catch { return; }
+  if (j.t==='st') { recibir(j); $('wifiTxt').textContent = j.ip ? 'WiFi '+(j.red||'')+' · http://'+j.ip : 'USB · en línea'; }
+  else if (j.t==='ev') log('Arduino: '+String(j.msg).replace(/</g,'&lt;'));
+  else if (j.t==='resp' && j.r!=='OK') log(j.cmd+' → '+j.r);
+}
+async function cerrarUsb(){
+  const p = puerto; puerto = null;
+  try { if (lectorUsb) await lectorUsb.cancel(); } catch {}
+  try { if (escritor) { escritor.releaseLock(); } } catch {}
+  escritor = null; lectorUsb = null;
+  await new Promise(r=>setTimeout(r,50));
+  try { if (p) await p.close(); } catch {}
+}
+$('bUsb').onclick = conectarUsb;
+$('bUsb2').onclick = conectarUsb;
 let personaReal = null;
 function recibir(d){
   ultimoMsg = Date.now();
-  setMqtt('recibiendo datos del Arduino','ok'); $('wifiTxt').textContent='WiFi · en línea';
+  if (S.fuente==='mqtt') { setMqtt('recibiendo datos del Arduino','ok'); $('wifiTxt').textContent='WiFi · en línea'; }
   const antes = S.estado, lucesAntes = S.luces;
   S.estado = ['OCUPADA','ESPERA','VACIA'].includes(d.estado) ? d.estado : 'VACIA';
   S.luces = !!d.luces; S.manual = d.modo === 'MANUAL';
   S.temp = typeof d.temp === 'number' ? d.temp : null;
+  S.hum = typeof d.hum === 'number' ? d.hum : null;
+  if (d.lcd1 != null) { S.lcd1 = d.lcd1; S.lcd2 = d.lcd2; }
   S.restante = d.restante|0; S.uso = d.usoSeg||0; S.consWh = d.consumoWh||0; S.sinWh = d.sinSistemaWh||0;
   if (d.potencia) S.pot = d.potencia;
   if (d.tiempo && document.activeElement !== $('rTiempo')) { S.tiempo = d.tiempo; $('rTiempo').value = d.tiempo; $('oTiempo').textContent = d.tiempo+' s'; }
@@ -613,7 +695,7 @@ function recibir(d){
   hist.push({t:S.t,sin:S.sinWh,cons:S.consWh,temp:S.temp}); if (hist.length>400) hist.shift();
   marcarRemoto(); pintar();
 }
-setInterval(()=>{ if (S.fuente==='mqtt' && ultimoMsg) { const s=Math.round((Date.now()-ultimoMsg)/1000); $('ultima').textContent = s<5 ? 'en vivo' : 'último dato hace '+s+' s'; if (s>10) { $('wifiTxt').textContent='sin datos del Arduino'; } } }, 1000);
+setInterval(()=>{ if (S.fuente!=='sim' && ultimoMsg) { const s=Math.round((Date.now()-ultimoMsg)/1000); $('ultima').textContent = s<5 ? 'en vivo' : 'último dato hace '+s+' s'; if (s>10) { $('wifiTxt').textContent='sin datos del Arduino'; } } }, 1000);
 $('bConectar').onclick = conectar;
 $('bDesconectar').onclick = desconectar;
 
