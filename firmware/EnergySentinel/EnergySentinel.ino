@@ -481,6 +481,7 @@ void setup() {
   pinMode(PIN_RELE_VENT, OUTPUT);
   randomSeed(analogRead(A5));
 
+  delay(1000);   // la pantalla LCD necesita tiempo para encender antes de configurarla
   lcdIniciar();
   lcdLinea(0, "ENERGY SENTINEL");
   lcdLinea(1, "Detectar.Ahorrar");
