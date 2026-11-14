@@ -22,6 +22,8 @@
     LED verde  (aula ocupada)    D8  -> 220 ohm -> LED -> GND
     LED amarillo (ventilador)    D9  -> 220 ohm -> LED -> GND
     LED rojo (ahorro)            D10 -> 220 ohm -> LED -> GND   (luces apagadas)
+    Buzzer                       (+) -> A0   (-) -> GND   (activo o pasivo, sirven los dos)
+      pita al ENCENDERSE las luces del salon y al APAGARSE el ventilador
     LCD 16x2 I2C                 VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
                                  (direccion 0x27 o 0x3F: se detecta sola)
 
@@ -38,6 +40,7 @@
     LUZ1_ON .. LUZ4_ON | LUZ1_OFF .. LUZ4_OFF   (una luz sola; tambien "LUZ 2 ON")
     VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C>
     GENTE_SI (hay alguien) | GENTE_NO (no hay nadie) | GENTE_AUTO (decide el PIR)
+    BUZZER_ON | BUZZER_OFF (silenciar) | PITAR (prueba)
 */
 
 #include <WiFiS3.h>
@@ -75,6 +78,7 @@ const uint8_t PIN_LED_OCUPADA = 8;   // verde: aula ocupada (luces encendidas)
 const uint8_t PIN_LED_VENT    = 9;   // amarillo: ventilador encendido
 const uint8_t PIN_LED_AHORRO  = 10;  // rojo: luces apagadas (ahorro)
 const uint8_t PIN_RELE_VENT   = 7;    // modulo rele 5 V -> ventilador
+const uint8_t PIN_BUZZER      = A0;   // buzzer
 
 // ================== OPCIONES ==================
 // true  = Bluetooth (BLE) + USB.   false = WiFi / internet (MQTT) + USB.
@@ -128,13 +132,42 @@ void evento(const String& msg) {
   Serial.print("{\"t\":\"ev\",\"msg\":\""); Serial.print(m); Serial.println("\"}");
 }
 
+// ================== BUZZER (sin bloquear) ==================
+bool buzzerOn = true;          // se puede silenciar desde la pagina (BUZZER_OFF)
+// cada sonido es una lista de pares: frecuencia (Hz, 0 = silencio), duracion (ms)
+uint16_t cola[16];
+uint8_t colaN = 0, colaI = 0;
+unsigned long notaHasta = 0;
+
+void sonar(const uint16_t* n, uint8_t cuantas) {
+  if (!buzzerOn) return;
+  colaN = min((int)cuantas, 8); colaI = 0; notaHasta = 0;
+  for (uint8_t i = 0; i < colaN * 2; i++) cola[i] = n[i];
+}
+const uint16_t SON_LUZ_ON[]   = {1200, 90, 0, 50, 1800, 140};   // dos pitidos que suben
+const uint16_t SON_VENT_OFF[] = {1400, 110, 0, 40, 800, 260};   // uno que baja
+const uint16_t SON_PRUEBA[]   = {1000, 120, 0, 60, 1500, 120, 0, 60, 2000, 200};
+
+void atenderBuzzer() {
+  if (colaI >= colaN) return;
+  unsigned long ahora = millis();
+  if (notaHasta && (long)(ahora - notaHasta) < 0) return;
+  if (notaHasta) colaI++;            // termino la nota anterior
+  if (colaI >= colaN) { noTone(PIN_BUZZER); digitalWrite(PIN_BUZZER, LOW); colaN = colaI = 0; notaHasta = 0; return; }
+  uint16_t hz = cola[colaI * 2], ms = cola[colaI * 2 + 1];
+  if (hz) tone(PIN_BUZZER, hz); else { noTone(PIN_BUZZER); digitalWrite(PIN_BUZZER, LOW); }
+  notaHasta = ahora + ms;
+}
+
 int lucesOn() { int n = 0; for (int i = 0; i < 4; i++) n += lamp[i]; return n; }
 
 void ponerLuz(int i, bool on, unsigned long retraso = 0) {
   if (lamp[i] == on) return;
+  bool antes = luces;
   lamp[i] = on;
   lampDesde[i] = millis() + retraso;
   luces = lucesOn() > 0;
+  if (!antes && luces) sonar(SON_LUZ_ON, 3);   // se encendio la luz del salon
 }
 
 // todas las luces a la vez (en cascada: una tras otra, como en un aula real)
@@ -166,6 +199,7 @@ void ponerVent(bool on) {
   if (vent == on) return;
   vent = on;
   digitalWrite(PIN_RELE_VENT, (on == RELE_ACTIVO_ALTO) ? HIGH : LOW);
+  if (!on) sonar(SON_VENT_OFF, 3);             // se apago el ventilador
   evento(String("Ventilador ") + (on ? "encendido" : "apagado") + (ventManual ? " (manual)" : " (automatico)"));
 }
 
@@ -390,6 +424,9 @@ String ejecutar(String cmd) {
   if (up == "GENTE_SI")   { gente = 1;  evento("Orden: hay alguien en el aula"); return "OK"; }
   if (up == "GENTE_NO")   { gente = 0;  estado = 0; evento("Orden: no hay nadie en el aula"); return "OK"; }
   if (up == "GENTE_AUTO") { gente = -1; evento("Orden: la presencia la decide el sensor PIR"); return "OK"; }
+  if (up == "BUZZER_ON")  { buzzerOn = true;  evento("Buzzer activado"); sonar(SON_PRUEBA, 5); return "OK"; }
+  if (up == "BUZZER_OFF") { buzzerOn = false; colaN = colaI = 0; noTone(PIN_BUZZER); evento("Buzzer silenciado"); return "OK"; }
+  if (up == "PITAR")      { sonar(SON_PRUEBA, 5); return "OK"; }
   if (up == "VENT_ON")   { ventManual = true; ponerVent(true);  return "OK"; }
   if (up == "VENT_OFF")  { ventManual = true; ponerVent(false); return "OK"; }
   if (up == "VENT_AUTO") { ventManual = false; evento("Ventilador en automatico (desde " + String(tempVent, 1) + " C)"); return "OK"; }
@@ -429,6 +466,7 @@ String jsonEstado() {
   j += ",\"ventSeg\":" + String((long)ventSeg);
   j += ",\"ble\":" + String(bleConectado ? 1 : 0);
   j += ",\"gente\":" + String(gente);
+  j += ",\"buzzer\":" + String(buzzerOn ? 1 : 0);
   j += "}";
   return j;
 }
@@ -633,6 +671,8 @@ void setup() {
   pinMode(PIN_LED_OCUPADA, OUTPUT);
   pinMode(PIN_LED_VENT, OUTPUT);
   pinMode(PIN_LED_AHORRO, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
+  digitalWrite(PIN_BUZZER, LOW);
   digitalWrite(PIN_RELE_VENT, RELE_ACTIVO_ALTO ? LOW : HIGH);   // ventilador apagado al arrancar
   pinMode(PIN_RELE_VENT, OUTPUT);
   randomSeed(analogRead(A5));
@@ -689,6 +729,7 @@ void loop() {
   else { float f = (sin(ahora / 650.0) + 1) / 2; analogWrite(PIN_LED_AHORRO, 25 + (int)(f * f * 230)); }
   animarLuces();
   actualizarMatriz();
+  atenderBuzzer();
 
   // 3) AHORRAR: medir uso y energia cada segundo
   if (ahora - ultimoTick >= 1000) {

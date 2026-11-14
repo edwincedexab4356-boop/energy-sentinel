@@ -33,6 +33,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 | LED verde (aula ocupada) | + / − | **D8** (con 220 Ω) / GND |
 | LED amarillo (ventilador) | + / − | **D9** (con 220 Ω) / GND |
 | LED rojo (ahorro) | + / − | **D10** (con 220 Ω) / GND |
+| Buzzer | + / − | **A0** / GND (pita al encender las luces y al apagar el ventilador) |
 | LCD 16x2 I2C | VCC / GND / SDA / SCL | 5V / GND / **SDA** / **SCL** |
 
 - El PIR detecta a alguien → se enciende la luz del aula. Sin movimiento durante 30 s → se apaga.
@@ -61,3 +62,5 @@ para volver a WiFi/internet pon `MODO_BLUETOOTH = false`.
 `LUZ1_ON` … `LUZ4_ON` · `LUZ1_OFF` … `LUZ4_OFF` (una luz sola)
 
 `VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28` · `GENTE_SI` · `GENTE_NO` · `GENTE_AUTO`
+
+`BUZZER_ON` · `BUZZER_OFF` (silenciar) · `PITAR` (prueba)
