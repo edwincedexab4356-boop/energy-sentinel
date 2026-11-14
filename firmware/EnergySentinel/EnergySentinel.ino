@@ -29,6 +29,7 @@
   COMANDOS (texto, uno por linea)
     LUZ_ON | LUZ_OFF | AUTO | TIEMPO <seg> | POTENCIA <W> | REINICIAR | ESTADO
     VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C>
+    GENTE_SI (hay alguien) | GENTE_NO (no hay nadie) | GENTE_AUTO (decide el PIR)
 */
 
 #include <WiFiS3.h>
@@ -89,6 +90,7 @@ unsigned long ultimoMovimiento = 0, ultimoTick = 0;
 double usoSeg = 0, consumoWh = 0, sinSistemaWh = 0;
 String lcd1 = "", lcd2 = "";
 bool vent = false, ventManual = false, bleConectado = false;
+int gente = -1;   // -1 = decide el sensor PIR, 1 = hay alguien, 0 = no hay nadie (desde la pagina)
 double ventSeg = 0;
 
 WiFiServer servidor(80);
@@ -236,6 +238,9 @@ String ejecutar(String cmd) {
   }
   if (up == "REINICIAR") { reiniciarContadores(); evento("Contadores de energia reiniciados"); return "OK"; }
   if (up == "ESTADO") return "OK";
+  if (up == "GENTE_SI")   { gente = 1;  evento("Orden: hay alguien en el aula"); return "OK"; }
+  if (up == "GENTE_NO")   { gente = 0;  estado = 0; evento("Orden: no hay nadie en el aula"); return "OK"; }
+  if (up == "GENTE_AUTO") { gente = -1; evento("Orden: la presencia la decide el sensor PIR"); return "OK"; }
   if (up == "VENT_ON")   { ventManual = true; ponerVent(true);  return "OK"; }
   if (up == "VENT_OFF")  { ventManual = true; ponerVent(false); return "OK"; }
   if (up == "VENT_AUTO") { ventManual = false; evento("Ventilador en automatico (desde " + String(tempVent, 1) + " C)"); return "OK"; }
@@ -273,6 +278,7 @@ String jsonEstado() {
   j += ",\"temp_vent\":" + String(tempVent, 1);
   j += ",\"ventSeg\":" + String((long)ventSeg);
   j += ",\"ble\":" + String(bleConectado ? 1 : 0);
+  j += ",\"gente\":" + String(gente);
   j += "}";
   return j;
 }
@@ -502,6 +508,8 @@ void loop() {
 
   // 1) DETECTAR
   pir = HAY_PIR && ahora > MS_CALENTAR_PIR && digitalRead(PIN_PIR) == HIGH;
+  if (gente == 1) pir = true;    // la pagina dice que hay alguien
+  if (gente == 0) pir = false;   // la pagina dice que no hay nadie
   if (pir) { ultimoMovimiento = ahora; estado = 1; }
   else if (estado != 0) estado = (ahora - ultimoMovimiento < tiempoApagadoMs) ? 2 : 0;
   if (estado != estadoPrevio) {
@@ -516,7 +524,7 @@ void loop() {
   // 2) AUTOMATIZAR
   if (!manual) ponerLuces(estado != 0);
   if (!ventManual) {
-    if (isnan(temperatura)) ponerVent(false);
+    if (isnan(temperatura) || estado == 0) ponerVent(false);   // aula vacia: no hace falta ventilar
     else if (temperatura >= tempVent) ponerVent(true);
     else if (temperatura <= tempVent - HISTERESIS) ponerVent(false);
   }

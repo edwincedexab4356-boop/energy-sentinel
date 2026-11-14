@@ -77,7 +77,15 @@ canvas{width:100%;height:150px;display:block}
 .leyenda i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
 .remoto{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .remoto .btn{padding:12px 6px;text-align:center}
-.remoto .btn[aria-pressed=true]{outline:2px solid var(--verde);outline-offset:1px}
+.remoto .btn[aria-pressed=true],.lamps .btn[aria-pressed=true]{outline:2px solid var(--verde);outline-offset:1px}
+.lamps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.lamps .btn{padding:9px 4px;text-align:center;font-size:13px}
+.sub{font-size:12px;color:var(--mut);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.08em}
+.tubo{cursor:pointer}
+#aspas{transform-box:fill-box;transform-origin:center}
+#aspas.gira{animation:girar .6s linear infinite}
+@keyframes girar{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#aspas.gira{animation-duration:3s}}
 .log{font:12px/1.5 var(--mono);color:var(--mut);max-height:170px;overflow:auto;margin:0;padding:0;list-style:none}
 .log li{padding:2px 0;border-bottom:1px solid #1a2540}
 .log b{color:var(--txt);font-weight:500}
@@ -162,6 +170,14 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
         <circle id="pirLed" cx="588" cy="42" r="3.2" fill="#555"/>
         <text x="572" y="62" fill="#e6edf7" font-size="10" text-anchor="end">PIR</text>
       </g>
+      <g aria-label="Ventilador">
+        <circle cx="560" cy="300" r="24" fill="#0c1426" stroke="#8a9bb8" stroke-width="2"/>
+        <g id="aspas" fill="#8a9bb8">
+          <ellipse cx="560" cy="288" rx="5" ry="11"/><ellipse cx="571" cy="306" rx="5" ry="11" transform="rotate(120 571 306)"/><ellipse cx="549" cy="306" rx="5" ry="11" transform="rotate(240 549 306)"/>
+        </g>
+        <circle cx="560" cy="300" r="4" fill="#e6edf7"/>
+        <text x="560" y="338" fill="#e6edf7" font-size="10" text-anchor="middle">VENTILADOR</text>
+      </g>
       <g>
         <rect x="590" y="176" width="14" height="22" rx="2" fill="#2b7bd6"/>
         <text x="584" y="191" fill="#e6edf7" font-size="10" text-anchor="end">DHT11 <tspan id="tSvg">--</tspan></text>
@@ -229,20 +245,33 @@ Detectar.Ahorrar</div>
         <button class="btn" id="rOff" aria-pressed="false">🌙 Apagar</button>
         <button class="btn" id="rAuto" aria-pressed="true">⚙ Automático</button>
       </div>
+      <div class="sub">Cada luz por separado <span id="lampNota" style="text-transform:none;letter-spacing:0">(también puedes tocar la luz en el dibujo)</span></div>
+      <div class="lamps" role="group" aria-label="Luces una por una">
+        <button class="btn" data-l="0" aria-pressed="false">💡 Luz 1</button>
+        <button class="btn" data-l="1" aria-pressed="false">💡 Luz 2</button>
+        <button class="btn" data-l="2" aria-pressed="false">💡 Luz 3</button>
+        <button class="btn" data-l="3" aria-pressed="false">💡 Luz 4</button>
+      </div>
+      <div class="sub">¿Hay alguien en el aula?</div>
+      <div class="remoto" role="group" aria-label="Presencia en el aula">
+        <button class="btn" id="gSi" aria-pressed="false">🙋 Sí, hay alguien</button>
+        <button class="btn" id="gNo" aria-pressed="false">🚫 No hay nadie</button>
+        <button class="btn" id="gAuto" aria-pressed="true">📡 Que decida el sensor</button>
+      </div>
       <div class="fila"><span>Potencia del aula real</span><input type="number" id="iPot" value="144" min="10" max="2000" style="width:80px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"> <span>W</span><span style="margin-left:auto">Tarifa</span><input type="number" id="iTar" value="0.21" step="0.01" min="0" style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>$/kWh</span></div>
     </div>
 
     <div class="card">
-      <h2>Ventilador <span class="der pill" id="climaFuente">solo con el Arduino real</span></h2>
+      <h2>Ventilador <span class="der pill" id="climaFuente">simulación</span></h2>
       <div class="kpis">
-        <div class="kpi"><div class="l">Ventilador (relé 5 V)</div><div class="v" id="kVent">--</div><div class="s" id="kVentS">se enciende desde 28 °C</div></div>
+        <div class="kpi"><div class="l">Ventilador (relé 5 V)</div><div class="v" id="kVent">--</div><div class="s" id="kVentS">se enciende con calor y gente en el aula</div></div>
       </div>
       <div class="remoto" role="group" aria-label="Control del ventilador">
-        <button class="btn" id="vOn" disabled>🌀 Encender</button>
-        <button class="btn" id="vOff" disabled>⏹ Apagar</button>
-        <button class="btn" id="vAuto" disabled>🌡 Automático</button>
+        <button class="btn" id="vOn">🌀 Encender</button>
+        <button class="btn" id="vOff">⏹ Apagar</button>
+        <button class="btn" id="vAuto" aria-pressed="true">🌡 Automático</button>
       </div>
-      <div class="fila"><span>Encender el ventilador desde</span><input type="number" id="iTempVent" value="28" min="15" max="45" step="0.5" disabled style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>°C</span></div>
+      <div class="fila"><span>Encender el ventilador desde</span><input type="number" id="iTempVent" value="28" min="15" max="45" step="0.5" style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>°C</span></div>
     </div>
 
     <div class="card">
@@ -341,8 +370,9 @@ const lucesPos = [[190,118],[450,118],[190,222],[450,222]];
 const gL = $('luces'); const halos = [], tubos = [];
 lucesPos.forEach(([x,y]) => {
   halos.push(el('circle',{cx:x,cy:y,r:150,fill:'url(#glow)',opacity:0,style:'transition:opacity .5s'},gL));
-  tubos.push(el('rect',{x:x-32,y:y-5,width:64,height:10,rx:5,fill:'#555c6b',stroke:'#2b3140',style:'transition:fill .3s'},gL));
+  tubos.push(el('rect',{x:x-32,y:y-5,width:64,height:10,rx:5,fill:'#555c6b',stroke:'#2b3140',style:'transition:fill .3s',class:'tubo'},gL));
 });
+tubos.forEach((t,i)=>{ t.addEventListener('click',()=>luzSola(i)); el('title',{},t).textContent='Luz '+(i+1)+': toca para encender o apagar'; });
 const gPers = $('personas');
 const PUERTA = [70, 279], AFUERA = [-30, 279];
 const colores = ['#ff8a65','#ffd54f','#81c784','#64b5f6','#ba68c8','#f06292','#4dd0e1'];
@@ -351,8 +381,13 @@ const colores = ['#ff8a65','#ffd54f','#81c784','#64b5f6','#ba68c8','#f06292','#4
 const S = {
   t: 7*3600, personas: [], estado: 'VACIA', luces: false, manual: false,
   ultMov: -1e9, tiempo: 30, uso: 0, consWh: 0, sinWh: 0, temp: 27.2, ext: 29,
-  vel: 1, pot: 144, tar: 0.21, dia: null, fuente: 'sim', restante: 0, activo: false
+  vel: 1, pot: 144, tar: 0.21, dia: null, fuente: 'sim', restante: 0, activo: false,
+  lamp: [false,false,false,false],          // cada luz del techo
+  vent: false, ventManual: false, tempVent: 28, ventSeg: 0,
+  gente: -1                                 // -1 sensor, 1 hay alguien, 0 no hay nadie
 };
+const nLamp = () => S.lamp.filter(Boolean).length;
+function todasLuces(on){ S.lamp = S.lamp.map(()=>on); S.luces = on; }
 const hist = [];
 
 function fmtHora(s){ s = Math.floor(s) % 86400; return String(Math.floor(s/3600)).padStart(2,'0')+':'+String(Math.floor(s/60)%60).padStart(2,'0'); }
@@ -410,14 +445,23 @@ function paso(dt){
   }
   if (!S.manual) {
     const quiere = S.estado !== 'VACIA';
-    if (quiere !== S.luces) { S.luces = quiere; log('Luces '+(quiere?'<b>encendidas</b>':'<b>apagadas</b>')+' automáticamente'); }
+    if (quiere !== S.luces || (quiere && nLamp() < 4)) { const cambio = quiere !== S.luces; todasLuces(quiere); if (cambio) log('Luces '+(quiere?'<b>encendidas</b>':'<b>apagadas</b>')+' automáticamente'); }
   }
+  S.luces = nLamp() > 0;
   if (S.estado !== 'VACIA') S.uso += dt;
-  if (S.luces) S.consWh += S.pot*dt/3600;
+  if (S.luces) S.consWh += S.pot*nLamp()/4*dt/3600;
+  // ventilador: automático por temperatura
+  if (!S.ventManual) {
+    // solo si hay alguien en el aula y hace calor
+    if (!S.vent && S.estado !== 'VACIA' && S.temp >= S.tempVent) { S.vent = true; log('Calor ('+S.temp.toFixed(1)+' °C) → ventilador <b>encendido</b>'); }
+    else if (S.vent && S.estado === 'VACIA') { S.vent = false; log('Aula vacía → ventilador <b>apagado</b>'); }
+    else if (S.vent && S.temp <= S.tempVent - 1.5) { S.vent = false; log('Aula fresca → ventilador <b>apagado</b>'); }
+  }
+  if (S.vent) S.ventSeg += dt;
   if (S.estado !== 'VACIA') S.activo = true;   // la jornada empieza con la primera persona
   if (S.activo) S.sinWh += S.pot*dt/3600;
   // temperatura: tiende al exterior + calor de las personas
-  const objetivo = S.ext - 1.5 + S.personas.length*0.35 + (S.luces?0.2:0);
+  const objetivo = S.ext - 1.5 + S.personas.length*0.35 + nLamp()*0.05 - (S.vent?2.5:0);
   S.temp += (objetivo - S.temp) * Math.min(1, dt/900) + (Math.random()-.5)*0.02*Math.min(dt,5);
 }
 
@@ -451,7 +495,8 @@ function reiniciar(silencio){
   if (S.fuente !== 'sim' && !silencio) { enviar('REINICIAR'); log('Orden: reiniciar contadores'); return; }
   pararDia(false);
   S.personas.forEach(p=>p.g.remove()); S.personas = [];
-  Object.assign(S,{t:7*3600,estado:'VACIA',luces:false,manual:false,activo:false,ultMov:-1e9,uso:0,consWh:0,sinWh:0,temp:S.ext-1.8,restante:0});
+  Object.assign(S,{t:7*3600,estado:'VACIA',luces:false,manual:false,activo:false,ultMov:-1e9,uso:0,consWh:0,sinWh:0,temp:S.ext-1.8,restante:0,
+    lamp:[false,false,false,false],vent:false,ventManual:false,ventSeg:0,gente:-1});
   hist.length = 0; $('log').innerHTML = '';
   if(!silencio) log('Sistema reiniciado');
   marcarRemoto();
@@ -473,8 +518,21 @@ function lcdTexto(){
 function pintar(){
   const on = S.luces;
   $('oscuro').setAttribute('opacity', on ? '0' : '.62');
-  halos.forEach(h=>h.setAttribute('opacity', on ? '1':'0'));
-  tubos.forEach(t=>t.setAttribute('fill', on ? '#fffbe0':'#555c6b'));
+  const real = S.fuente !== 'sim';
+  const lit = i => real ? on : S.lamp[i];
+  $('oscuro').setAttribute('opacity', on ? (real ? '0' : String(.62*(1-nLamp()/4))) : '.62');
+  halos.forEach((h,i)=>h.setAttribute('opacity', lit(i) ? '1':'0'));
+  tubos.forEach((t,i)=>t.setAttribute('fill', lit(i) ? '#fffbe0':'#555c6b'));
+  document.querySelectorAll('.lamps .btn').forEach((b,i)=>{ b.setAttribute('aria-pressed', String(lit(i))); b.disabled = real; });
+  $('lampNota').textContent = real ? '(la maqueta real tiene una sola salida de luz: usa Encender / Apagar)' : '(también puedes tocar la luz en el dibujo)';
+  $('aspas').classList.toggle('gira', !!S.vent);
+  $('aspas').setAttribute('fill', S.vent ? '#5aa8ff' : '#8a9bb8');
+  $('gSi').setAttribute('aria-pressed', String(real ? S.gente===1 : S.personas.length>0));
+  $('gNo').setAttribute('aria-pressed', String(real ? S.gente===0 : S.personas.length===0));
+  $('gAuto').setAttribute('aria-pressed', String(real && S.gente===-1));
+  $('gAuto').title = real ? '' : 'En la simulación tú decides quién entra y sale';
+  $('gAuto').disabled = !real;
+  if (!real) climaSim();
   $('ledOcupada').classList.toggle('on', S.estado==='OCUPADA');
   $('ledEspera').classList.toggle('on', S.estado==='ESPERA');
   $('ledAhorro').classList.toggle('on', !on);
@@ -486,7 +544,7 @@ function pintar(){
   kE.textContent = {OCUPADA:'OCUPADA',ESPERA:'EN ESPERA',VACIA:'DESOCUPADA'}[S.estado];
   kE.className = 'v estado-'+S.estado.toLowerCase();
   $('kPersonas').textContent = S.fuente==='sim' ? (S.personas.length+(S.personas.length===1?' persona':' personas')) + (S.estado==='ESPERA'?' · apaga en '+S.restante+' s':'') : (S.estado==='ESPERA'?'apaga en '+S.restante+' s':'sensor PIR');
-  $('kLuces').textContent = on ? 'ENCENDIDAS' : 'APAGADAS';
+  $('kLuces').textContent = on ? (S.fuente==='sim' && nLamp()<4 ? nLamp()+' DE 4' : 'ENCENDIDAS') : 'APAGADAS';
   $('kLuces').style.color = on ? 'var(--ambar)' : 'var(--azul)';
   $('kModo').textContent = S.manual ? 'Control manual (remoto)' : 'Modo automático';
   $('kTemp').textContent = S.temp==null ? '-- °C' : S.temp.toFixed(1)+' °C';
@@ -558,11 +616,28 @@ function marcarRemoto(){
 }
 function remoto(cmd){
   if (S.fuente !== 'sim') { enviar(cmd); log('Orden remota enviada al Arduino: <b>'+cmd+'</b>'); return; }
-  if (cmd==='LUZ_ON'){ S.manual=true; S.luces=true; log('📱 Orden remota: luces <b>encendidas</b>'); }
-  if (cmd==='LUZ_OFF'){ S.manual=true; S.luces=false; log('📱 Orden remota: luces <b>apagadas</b>'); }
-  if (cmd==='AUTO'){ S.manual=false; log('📱 Orden remota: vuelve al <b>modo automático</b>'); }
+  if (cmd==='LUZ_ON'){ S.manual=true; todasLuces(true); log('📱 Orden remota: luces <b>encendidas</b>'); }
+  if (cmd==='LUZ_OFF'){ S.manual=true; todasLuces(false); log('📱 Orden remota: luces <b>apagadas</b>'); }
+  if (cmd==='AUTO'){ S.manual=false; todasLuces(S.estado!=='VACIA'); log('📱 Orden remota: vuelve al <b>modo automático</b>'); }
   marcarRemoto(); pintar();
 }
+function luzSola(i){
+  if (S.fuente !== 'sim') return;
+  S.manual = true; S.lamp[i] = !S.lamp[i]; S.luces = nLamp() > 0;
+  log('📱 Luz '+(i+1)+' <b>'+(S.lamp[i]?'encendida':'apagada')+'</b> a mano ('+nLamp()+' de 4 encendidas)');
+  marcarRemoto(); pintar();
+}
+document.querySelectorAll('.lamps .btn').forEach(b=>b.onclick=()=>luzSola(+b.dataset.l));
+function presencia(v){
+  if (S.fuente !== 'sim') { S.gente = v; enviar(v===1?'GENTE_SI':v===0?'GENTE_NO':'GENTE_AUTO'); log('Orden enviada al Arduino: <b>'+(v===1?'hay alguien':v===0?'no hay nadie':'decide el sensor')+'</b>'); pintar(); return; }
+  if (S.dia !== null) pararDia(false);
+  if (v===1) { if (!S.personas.length) entra(); else log('Ya hay '+S.personas.length+' en el aula'); }
+  if (v===0) { if (S.personas.length) { log('Todos salen del aula'); ajustarPersonas(0); } S.ultMov = -1e9; S.estado = 'VACIA'; }
+  pintar();
+}
+$('gSi').onclick = ()=>presencia(1);
+$('gNo').onclick = ()=>presencia(0);
+$('gAuto').onclick = ()=>presencia(-1);
 $('rOn').onclick = ()=>remoto('LUZ_ON');
 $('rOff').onclick = ()=>remoto('LUZ_OFF');
 $('rAuto').onclick = ()=>remoto('AUTO');
@@ -635,8 +710,7 @@ async function desconectar(){
   $('remotoDestino').textContent='a la simulación'; $('wifiTxt').textContent='WiFi · enviando datos'; $('ultima').textContent='';
   document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=false);
   $('bDesconectar').disabled=true; $('bConectar').textContent='Conectar';
-  ['vOn','vOff','vAuto','iTempVent'].forEach(id=>$(id).disabled=true);
-  $('climaFuente').textContent='solo con el Arduino real'; $('kVent').textContent='--'; ventAntes=null;
+  ventAntes=null;
   reiniciar(true); log('De vuelta a la simulación');
 }
 function enviar(cmd){
@@ -761,6 +835,9 @@ let ventAntes = null;
 function clima(d){
   if (!('vent' in d)) return;
   const man = d.vent_modo === 'MANUAL';
+  S.vent = !!d.vent; S.ventManual = man;
+  if (typeof d.gente === 'number') S.gente = d.gente;
+  pintar();
   $('climaFuente').textContent = 'en vivo';
   $('kVent').textContent = d.vent ? 'ENCENDIDO' : 'APAGADO';
   const m = (d.ventSeg|0), hh = String(m/3600|0).padStart(2,'0'), mm = String((m/60|0)%60).padStart(2,'0');
@@ -773,7 +850,23 @@ function clima(d){
   if (ventAntes !== null && ventAntes !== !!d.vent) log('Arduino: ventilador <b>'+(d.vent?'encendido':'apagado')+'</b>');
   ventAntes = !!d.vent;
 }
-const ordenClima = c => { if (S.fuente !== 'sim') { enviar(c); log('Orden enviada al Arduino: <b>'+c+'</b>'); } };
+function climaSim(){
+  $('climaFuente').textContent = 'simulación';
+  $('kVent').textContent = S.vent ? 'ENCENDIDO' : 'APAGADO';
+  $('kVentS').textContent = (S.ventManual ? 'manual' : 'automático: desde '+S.tempVent+' °C') + ' · uso '+fmtDur(S.ventSeg).slice(0,5);
+  if (document.activeElement !== $('iTempVent')) $('iTempVent').value = S.tempVent;
+  $('vOn').setAttribute('aria-pressed', String(S.ventManual && S.vent));
+  $('vOff').setAttribute('aria-pressed', String(S.ventManual && !S.vent));
+  $('vAuto').setAttribute('aria-pressed', String(!S.ventManual));
+}
+const ordenClima = c => {
+  if (S.fuente !== 'sim') { enviar(c); log('Orden enviada al Arduino: <b>'+c+'</b>'); return; }
+  if (c==='VENT_ON')  { S.ventManual = true;  S.vent = true;  log('📱 Ventilador <b>encendido</b> a mano'); }
+  if (c==='VENT_OFF') { S.ventManual = true;  S.vent = false; log('📱 Ventilador <b>apagado</b> a mano'); }
+  if (c==='VENT_AUTO'){ S.ventManual = false; log('📱 Ventilador en <b>automático</b> (desde '+S.tempVent+' °C)'); }
+  if (c.startsWith('TEMP_VENT')) { S.tempVent = +c.split(' ')[1]; log('Ventilador se enciende desde <b>'+S.tempVent+' °C</b>'); }
+  pintar();
+};
 $('vOn').onclick = ()=>ordenClima('VENT_ON');
 $('vOff').onclick = ()=>ordenClima('VENT_OFF');
 $('vAuto').onclick = ()=>ordenClima('VENT_AUTO');

@@ -33,7 +33,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 
 - El PIR detecta a alguien → se enciende la luz del aula. Sin movimiento durante 30 s → se apaga.
 - Ventilador: COM del relé → 5V; NO → ventilador (+); ventilador (−) → GND.
-  Se enciende solo desde 28 °C (se cambia en la página) y se apaga 1.5 °C por debajo.
+  Se enciende solo si hay alguien y hace 28 °C o más (se cambia en la página); se apaga 1.5 °C por debajo o si el aula queda vacía.
 - Si el ventilador funciona al revés, cambia `RELE_ACTIVO_ALTO` a `false`.
 
 ## Bluetooth (sin HC-05)
@@ -54,4 +54,4 @@ para volver a WiFi/internet pon `MODO_BLUETOOTH = false`.
 
 `LUZ_ON` · `LUZ_OFF` · `AUTO` · `TIEMPO 30` · `POTENCIA 144` · `REINICIAR` · `ESTADO`
 
-`VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28`
+`VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28` · `GENTE_SI` · `GENTE_NO` · `GENTE_AUTO`
