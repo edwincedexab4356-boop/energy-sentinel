@@ -149,9 +149,10 @@ void sonar(const uint16_t* n, uint8_t cuantas) {
   colaN = min((int)cuantas, 8); colaI = 0; notaHasta = 0;
   for (uint8_t i = 0; i < colaN * 2; i++) cola[i] = n[i];
 }
-const uint16_t SON_LUZ_ON[]   = {1200, 90, 0, 50, 1800, 140};   // dos pitidos que suben
-const uint16_t SON_VENT_OFF[] = {1400, 110, 0, 40, 800, 260};   // uno que baja
-const uint16_t SON_PRUEBA[]   = {1000, 120, 0, 60, 1500, 120, 0, 60, 2000, 200};
+// Tonos entre 2700 y 3500 Hz: es donde un buzzer suena mas fuerte (se oye en toda el aula)
+const uint16_t SON_LUZ_ON[]   = {2700, 250, 0, 100, 3500, 400};                 // dos pitidos que suben
+const uint16_t SON_VENT_OFF[] = {3500, 300, 0, 100, 2700, 500};                 // dos que bajan
+const uint16_t SON_PRUEBA[]   = {2700, 300, 0, 120, 3200, 300, 0, 120, 3500, 500};
 
 void atenderBuzzer() {
   if (colaI >= colaN) return;
