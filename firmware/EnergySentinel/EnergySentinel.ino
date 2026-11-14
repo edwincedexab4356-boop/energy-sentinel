@@ -351,6 +351,7 @@ void conectarMqtt() {
   if (WiFi.status() != WL_CONNECTED) { WiFi.begin(SECRET_SSID, SECRET_PASS); return; }
   mqtt.setId(String("sentinel-") + CODIGO_AULA + "-" + String(random(10000)));
   mqtt.onMessage(alRecibir);
+  mqtt.setTxPayloadSize(1024);   // el estado mide mas de 256 bytes (el limite por defecto)
   if (mqtt.connect(BROKER, PUERTO)) {
     mqtt.subscribe(temaCmd);
     evento(String("Internet (MQTT) conectado, aula ") + CODIGO_AULA);
