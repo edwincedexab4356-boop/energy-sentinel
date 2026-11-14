@@ -26,7 +26,10 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 | Sensor PIR HC-SR501 | VCC / OUT / GND | 5V / **D2** / GND |
 | Sensor DHT11 (temperatura y humedad) | VCC / DATA / GND | 5V / **D4** / GND |
 | Módulo relé 5 V → ventilador 5 V | VCC / GND / IN | 5V / GND / **D7** |
-| Luz del aula (LED blanco) | + / − | **D6** (con 220 Ω) / GND |
+| Luz 1 del aula (LED blanco) | + / − | **D6** (con 330 Ω) / GND |
+| Luz 2 del aula (LED blanco) | + / − | **D3** (con 330 Ω) / GND |
+| Luz 3 del aula (LED blanco) | + / − | **D5** (con 330 Ω) / GND |
+| Luz 4 del aula (LED blanco) | + / − | **D11** (con 330 Ω) / GND |
 | LED verde (aula ocupada) | + / − | **D8** (con 220 Ω) / GND |
 | LED amarillo (ventilador) | + / − | **D9** (con 220 Ω) / GND |
 | LED rojo (ahorro) | + / − | **D10** (con 220 Ω) / GND |
@@ -54,5 +57,7 @@ para volver a WiFi/internet pon `MODO_BLUETOOTH = false`.
 ## Comandos (USB a 115200, Bluetooth, `http://IP/api/cmd?c=...` o MQTT)
 
 `LUZ_ON` · `LUZ_OFF` · `AUTO` · `TIEMPO 30` · `POTENCIA 144` · `REINICIAR` · `ESTADO`
+
+`LUZ1_ON` … `LUZ4_ON` · `LUZ1_OFF` … `LUZ4_OFF` (una luz sola)
 
 `VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28` · `GENTE_SI` · `GENTE_NO` · `GENTE_AUTO`

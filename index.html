@@ -395,7 +395,10 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
     <tr><td>Sensor PIR HC-SR501</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Detecta personas y enciende la luz del aula. Tarda ~30 s en activarse</td></tr>
     <tr><td>Sensor DHT11 (temperatura y humedad)</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Controla el ventilador</td></tr>
     <tr><td>Módulo relé 5 V (ventilador)</td><td>VCC / GND / IN</td><td>5V / GND / <b>D7</b></td><td>COM → 5V, NO → ventilador (+); ventilador (−) → GND</td></tr>
-    <tr><td>Luz del aula (LED blanco)</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 220 Ω</td></tr>
+    <tr><td>Luz 1 del aula (LED blanco)</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 330 Ω (cada luz con la suya)</td></tr>
+    <tr><td>Luz 2 del aula (LED blanco)</td><td>+ / −</td><td><b>D3</b> / GND</td><td>330 Ω</td></tr>
+    <tr><td>Luz 3 del aula (LED blanco)</td><td>+ / −</td><td><b>D5</b> / GND</td><td>330 Ω</td></tr>
+    <tr><td>Luz 4 del aula (LED blanco)</td><td>+ / −</td><td><b>D11</b> / GND</td><td>330 Ω · se encienden suave y una tras otra</td></tr>
     <tr><td>LED verde (aula ocupada)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
     <tr><td>LED amarillo (ventilador)</td><td>+ / −</td><td><b>D9</b> / GND</td><td>220 Ω</td></tr>
     <tr><td>LED rojo (ahorro: luces apagadas)</td><td>+ / −</td><td><b>D10</b> / GND</td><td>220 Ω</td></tr>
@@ -609,27 +612,30 @@ function reiniciar(silencio){
 function pct(){ return S.sinWh > 0 ? Math.round((S.sinWh - S.consWh)/S.sinWh*100) : 0; }
 
 /* ---------- Pintar ---------- */
+// \x01 = persona, \x02 = foco, \x03 = ventilador (iconos propios de la pantalla LCD)
 function lcdTexto(){
   if (S.fuente !== 'sim' && S.lcd1 != null) return S.lcd1+'\n'+S.lcd2;
-  const pad = s => (s+' '.repeat(16)).slice(0,16);
+  const dos = (a, b) => a.slice(0, 16-b.length).padEnd(16-b.length) + b;
   let l1;
-  if (S.estado==='ESPERA' && !S.manual) l1 = 'APAGA EN '+S.restante+'s';
-  else if (S.estado!=='VACIA') l1 = 'AULA OCUPADA '+(S.manual?'MAN':'');
-  else l1 = S.luces ? 'LUZ ON (MANUAL)' : 'AULA VACIA';
-  const l2 = 'T:'+(S.temp==null?'--.-':S.temp.toFixed(1))+'C VENT:'+(S.vent?'ON':'OFF');
-  return pad(l1)+'\n'+pad(l2);
+  if (S.estado==='ESPERA' && !S.manual) l1 = '\x01APAGA '+S.restante+'s';
+  else if (S.estado!=='VACIA') l1 = '\x01OCUPADA'+(S.manual?' MAN':'');
+  else l1 = S.luces ? 'LUZ MANUAL' : 'AULA VACIA';
+  const t = S.temp==null ? '--.-' : S.temp.toFixed(1), h = S.hum==null ? '' : ' H'+Math.round(S.hum)+'%';
+  return dos(l1, '\x02'+nLamp()+'/4') + '\n' + dos(t+'°C'+h, '\x03'+(S.vent?'ON':'OFF'));
 }
+let giroLcd = false;
+const lcdVer = t => t.replace(/\x01/g,'☺').replace(/\x02/g,'☼').replace(/\x03/g, S.vent && (giroLcd=!giroLcd) ? '+' : '✻');
 function pintar(){
   const on = S.luces;
   $('oscuro').setAttribute('opacity', on ? '0' : '.62');
   const real = S.fuente !== 'sim';
-  const lit = i => real ? on : S.lamp[i];
-  $('oscuro').setAttribute('opacity', on ? (real ? '0' : String(.55*(1-nLamp()/4))) : '.55');
+  const lit = i => S.lamp[i];
+  $('oscuro').setAttribute('opacity', on ? String(.55*(1-nLamp()/4)) : '.55');
   halos.forEach((h,i)=>h.setAttribute('opacity', lit(i) ? '1':'0'));
   auras.forEach((h,i)=>h.setAttribute('opacity', lit(i) ? '1':'0'));
   tubos.forEach((t,i)=>t.setAttribute('fill', lit(i) ? '#f4f9ff':'#9aa1b0'));
-  document.querySelectorAll('.lamps .btn').forEach((b,i)=>{ b.setAttribute('aria-pressed', String(lit(i))); b.disabled = real; });
-  $('lampNota').textContent = real ? '(la maqueta real tiene una sola salida de luz: usa Encender / Apagar)' : '(también puedes tocar la luz en el dibujo)';
+  document.querySelectorAll('.lamps .btn').forEach((b,i)=>b.setAttribute('aria-pressed', String(lit(i))));
+  $('lampNota').textContent = real ? '(cada luz de la maqueta está en su propio pin: D6, D3, D5 y D11)' : '(también puedes tocar la luz en el dibujo)';
   $('aspas').classList.toggle('gira', !!S.vent);
   $('aspas').setAttribute('fill', S.vent ? '#5aa8ff' : '#8a9bb8');
   $('gSi').setAttribute('aria-pressed', String(real ? S.gente===1 : S.personas.length>0));
@@ -643,7 +649,7 @@ function pintar(){
   $('svgLedV').setAttribute('fill', ledV ? '#45f0a0' : '#1f3a2c'); $('svgLedV').setAttribute('filter', ledV ? 'url(#resplandor)' : '');
   $('svgLedA').setAttribute('fill', ledA ? '#ffc044' : '#3d3418'); $('svgLedA').setAttribute('filter', ledA ? 'url(#resplandor)' : '');
   $('svgLedR').setAttribute('fill', ledR ? '#ff5252' : '#3d1a1a'); $('svgLedR').setAttribute('filter', ledR ? 'url(#resplandor)' : '');
-  const [l1, l2] = lcdTexto().split('\n'); $('lcdL1').textContent = l1; $('lcdL2').textContent = l2 || '';
+  const [l1, l2] = lcdVer(lcdTexto()).split('\n'); $('lcdL1').textContent = l1; $('lcdL2').textContent = l2 || '';
   $('reloj').textContent = S.fuente==='sim' ? fmtHora(S.t) : new Date().toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
   $('tSvg').textContent = S.temp==null ? '--' : S.temp.toFixed(1)+' °C';
 
@@ -651,7 +657,7 @@ function pintar(){
   kE.textContent = {OCUPADA:'OCUPADA',ESPERA:'EN ESPERA',VACIA:'DESOCUPADA'}[S.estado];
   kE.className = 'v estado-'+S.estado.toLowerCase();
   $('kPersonas').textContent = S.fuente==='sim' ? (S.personas.length+(S.personas.length===1?' persona':' personas')) + (S.estado==='ESPERA'?' · apaga en '+S.restante+' s':'') : (S.estado==='ESPERA'?'apaga en '+S.restante+' s':'sensor PIR');
-  $('kLuces').textContent = on ? (S.fuente==='sim' && nLamp()<4 ? nLamp()+' DE 4' : 'ENCENDIDAS') : 'APAGADAS';
+  $('kLuces').textContent = on ? (nLamp()<4 ? nLamp()+' DE 4' : 'ENCENDIDAS') : 'APAGADAS';
   $('kLuces').style.color = on ? 'var(--ambar)' : 'var(--azul)';
   $('kModo').textContent = S.manual ? 'Control manual (remoto)' : 'Modo automático';
   $('kTemp').textContent = S.temp==null ? '-- °C' : S.temp.toFixed(1)+' °C';
@@ -729,7 +735,7 @@ function remoto(cmd){
   marcarRemoto(); pintar();
 }
 function luzSola(i){
-  if (S.fuente !== 'sim') return;
+  if (S.fuente !== 'sim') { const on = !S.lamp[i]; S.lamp[i] = on; enviar('LUZ'+(i+1)+(on?'_ON':'_OFF')); log('Orden enviada al Arduino: luz '+(i+1)+' <b>'+(on?'encendida':'apagada')+'</b>'); pintar(); return; }
   S.manual = true; S.lamp[i] = !S.lamp[i]; S.luces = nLamp() > 0;
   log('📱 Luz '+(i+1)+' <b>'+(S.lamp[i]?'encendida':'apagada')+'</b> a mano ('+nLamp()+' de 4 encendidas)');
   marcarRemoto(); pintar();
@@ -923,6 +929,7 @@ function recibir(d){
   const antes = S.estado, lucesAntes = S.luces;
   S.estado = ['OCUPADA','ESPERA','VACIA'].includes(d.estado) ? d.estado : 'VACIA';
   S.luces = !!d.luces; S.manual = d.modo === 'MANUAL';
+  S.lamp = Array.isArray(d.lamp) && d.lamp.length === 4 ? d.lamp.map(Boolean) : S.lamp.map(()=>S.luces);
   S.temp = typeof d.temp === 'number' ? d.temp : null;
   S.hum = typeof d.hum === 'number' ? d.hum : null;
   if (d.lcd1 != null) { S.lcd1 = d.lcd1; S.lcd2 = d.lcd2; }

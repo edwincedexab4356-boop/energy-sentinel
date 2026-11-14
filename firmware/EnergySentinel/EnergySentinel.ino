@@ -6,13 +6,19 @@
   Libreria necesaria (Gestor de librerias del Arduino IDE):
     - ArduinoMqttClient (Arduino)
   El DHT11 y la pantalla LCD I2C se manejan con codigo propio (sin librerias).
+  La matriz de LEDs de la placa (Arduino_LED_Matrix) ya viene con la placa.
 
   CONEXIONES
     Sensor PIR HC-SR501          VCC -> 5V   OUT -> D2    GND -> GND
     Sensor DHT11 (temp/humedad)  VCC -> 5V   DATA -> D4   GND -> GND
     Modulo rele 5 V              VCC -> 5V   GND -> GND   IN -> D7
       (ventilador 5 V)           COM -> 5V   NO -> ventilador (+) ; ventilador (-) -> GND
-    Luces del aula (LED blanco)  D6  -> 220 ohm -> LED (+) ; LED (-) -> GND
+    Luces del aula: 4 LED blancos, CADA UNO en su pin y con su resistencia
+      Luz 1  D6  -> 330 ohm -> LED (+) ; LED (-) -> GND
+      Luz 2  D3  -> 330 ohm -> LED (+) ; LED (-) -> GND
+      Luz 3  D5  -> 330 ohm -> LED (+) ; LED (-) -> GND
+      Luz 4  D11 -> 330 ohm -> LED (+) ; LED (-) -> GND
+      (220 ohm tambien sirve, pero queda justo en el limite de 8 mA por pin)
     LED verde  (aula ocupada)    D8  -> 220 ohm -> LED -> GND
     LED amarillo (ventilador)    D9  -> 220 ohm -> LED -> GND
     LED rojo (ahorro)            D10 -> 220 ohm -> LED -> GND   (luces apagadas)
@@ -29,6 +35,7 @@
 
   COMANDOS (texto, uno por linea)
     LUZ_ON | LUZ_OFF | AUTO | TIEMPO <seg> | POTENCIA <W> | REINICIAR | ESTADO
+    LUZ1_ON .. LUZ4_ON | LUZ1_OFF .. LUZ4_OFF   (una luz sola; tambien "LUZ 2 ON")
     VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C>
     GENTE_SI (hay alguien) | GENTE_NO (no hay nadie) | GENTE_AUTO (decide el PIR)
 */
@@ -37,6 +44,7 @@
 #include <ArduinoMqttClient.h>
 #include <ArduinoBLE.h>
 #include <Wire.h>
+#include "Arduino_LED_Matrix.h"
 
 // Datos de WiFi: en "arduino_secrets.h" (copia de arduino_secrets.example.h).
 // Si no existe, se usan estos valores por defecto.
@@ -62,7 +70,7 @@ const int  PUERTO   = 1883;
 // ================== PINES ==================
 const uint8_t PIN_PIR         = 2;
 const uint8_t PIN_DHT         = 4;
-const uint8_t PIN_LUCES       = 6;
+const uint8_t PIN_LUZ[4]      = {6, 3, 5, 11};   // las 4 luces del aula (pines PWM: se encienden suave)
 const uint8_t PIN_LED_OCUPADA = 8;   // verde: aula ocupada (luces encendidas)
 const uint8_t PIN_LED_VENT    = 9;   // amarillo: ventilador encendido
 const uint8_t PIN_LED_AHORRO  = 10;  // rojo: luces apagadas (ahorro)
@@ -87,10 +95,12 @@ const float HISTERESIS = 1.5;              // y se apaga 1.5 C por debajo
 // 0 = VACIA, 1 = OCUPADA, 2 = ESPERA (cuenta atras)
 int  estado = 0;
 bool luces = false, manual = false, activo = false, pir = false;
+bool lamp[4] = {false, false, false, false};   // cada luz del techo
+int brillo[4] = {0, 0, 0, 0};                  // brillo actual (0-255) para el encendido suave
+unsigned long lampDesde[4] = {0, 0, 0, 0};     // las luces se encienden una tras otra
 float temperatura = NAN, humedad = NAN;
 unsigned long ultimoMovimiento = 0, ultimoTick = 0;
 double usoSeg = 0, consumoWh = 0, sinSistemaWh = 0;
-String lcd1 = "", lcd2 = "";
 bool vent = false, ventManual = false, bleConectado = false;
 int gente = -1;   // -1 = decide el sensor PIR, 1 = hay alguien, 0 = no hay nadie (desde la pagina)
 double ventSeg = 0;
@@ -118,11 +128,38 @@ void evento(const String& msg) {
   Serial.print("{\"t\":\"ev\",\"msg\":\""); Serial.print(m); Serial.println("\"}");
 }
 
+int lucesOn() { int n = 0; for (int i = 0; i < 4; i++) n += lamp[i]; return n; }
+
+void ponerLuz(int i, bool on, unsigned long retraso = 0) {
+  if (lamp[i] == on) return;
+  lamp[i] = on;
+  lampDesde[i] = millis() + retraso;
+  luces = lucesOn() > 0;
+}
+
+// todas las luces a la vez (en cascada: una tras otra, como en un aula real)
 void ponerLuces(bool on) {
-  if (luces == on) return;
-  luces = on;
-  digitalWrite(PIN_LUCES, on ? HIGH : LOW);
+  bool cambia = false;
+  for (int i = 0; i < 4; i++) if (lamp[i] != on) cambia = true;
+  if (!cambia) return;
+  for (int i = 0, k = 0; i < 4; i++) if (lamp[i] != on) ponerLuz(i, on, 180UL * k++);
   evento(String("Luces ") + (on ? "encendidas" : "apagadas") + (manual ? " (manual)" : " (automatico)"));
+}
+
+// encendido / apagado suave (se llama en cada vuelta del loop)
+unsigned long ultimoBrillo = 0;
+void animarLuces() {
+  unsigned long ahora = millis();
+  if (ahora - ultimoBrillo < 8) return;
+  ultimoBrillo = ahora;
+  for (int i = 0; i < 4; i++) {
+    if ((long)(ahora - lampDesde[i]) < 0) continue;
+    int obj = lamp[i] ? 255 : 0;
+    if (brillo[i] == obj) continue;
+    brillo[i] += lamp[i] ? 12 : -17;
+    brillo[i] = constrain(brillo[i], 0, 255);
+    analogWrite(PIN_LUZ[i], (brillo[i] * brillo[i]) / 255);   // curva para que el ojo lo vea parejo
+  }
 }
 
 void ponerVent(bool on) {
@@ -165,52 +202,150 @@ bool leerDHT11() {
 
 // ================== LCD 16x2 I2C (PCF8574, sin libreria) ==================
 // P0=RS P1=RW P2=EN P3=luz P4..P7=D4..D7
+// Se vuelve a configurar cada 5 s: si el rele o un cable flojo la "cuelga", se arregla sola.
 uint8_t lcdDir = 0;
+bool lcdAviso = false;
 
 void lcdBus(uint8_t v) { Wire.beginTransmission(lcdDir); Wire.write(v | 0x08); Wire.endTransmission(); }
-void lcdNibble(uint8_t v) { lcdBus(v | 0x04); delayMicroseconds(1); lcdBus(v & ~0x04); delayMicroseconds(50); }
+void lcdNibble(uint8_t v) { lcdBus(v | 0x04); delayMicroseconds(2); lcdBus(v & ~0x04); delayMicroseconds(60); }
 void lcdByte(uint8_t v, uint8_t rs) { lcdNibble((v & 0xF0) | rs); lcdNibble(((v << 4) & 0xF0) | rs); }
 void lcdCmd(uint8_t c) { lcdByte(c, 0); if (c < 4) delay(2); }
 
-void lcdIniciar() {
-  Wire.begin();
+// Iconos propios (5x8): 1 = persona, 2 = foco, 3 = ventilador (2 dibujos para que gire)
+const uint8_t ICO_PERSONA[8] = {0x0E, 0x0E, 0x04, 0x1F, 0x04, 0x0A, 0x11, 0x00};
+const uint8_t ICO_FOCO[8]    = {0x0E, 0x11, 0x11, 0x11, 0x0A, 0x0E, 0x0E, 0x04};
+const uint8_t ICO_VENT_A[8]  = {0x00, 0x19, 0x0B, 0x04, 0x1A, 0x13, 0x00, 0x00};
+const uint8_t ICO_VENT_B[8]  = {0x00, 0x04, 0x04, 0x1B, 0x04, 0x04, 0x00, 0x00};
+void lcdIcono(uint8_t n, const uint8_t* d) { lcdCmd(0x40 | (n << 3)); for (uint8_t i = 0; i < 8; i++) lcdByte(d[i], 1); }
+
+bool lcdBuscar() {
   const uint8_t dirs[] = {0x27, 0x3F, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20, 0x3E, 0x3D, 0x3C, 0x3B, 0x3A, 0x39, 0x38};
   for (uint8_t a : dirs) {
     Wire.beginTransmission(a);
-    if (Wire.endTransmission() == 0) { lcdDir = a; break; }
+    if (Wire.endTransmission() == 0) { lcdDir = a; return true; }
   }
-  if (!lcdDir) { evento("Pantalla LCD no encontrada (revisa SDA/SCL)"); return; }
-  delay(50);
+  return false;
+}
+
+void lcdConfigurar() {
   lcdBus(0);
-  lcdNibble(0x30); delay(5); lcdNibble(0x30); delay(1); lcdNibble(0x30); lcdNibble(0x20);  // modo 4 bits
+  lcdNibble(0x30); delay(5); lcdNibble(0x30); delay(1); lcdNibble(0x30); delay(1); lcdNibble(0x20);  // modo 4 bits
   lcdCmd(0x28);  // 2 lineas
   lcdCmd(0x0C);  // pantalla on, sin cursor
   lcdCmd(0x06);  // escribir hacia la derecha
+  lcdIcono(1, ICO_PERSONA); lcdIcono(2, ICO_FOCO); lcdIcono(3, ICO_VENT_A);
+}
+
+String lcd1 = "", lcd2 = "";            // lo que se ve en la pantalla
+String lcdHecho1 = "", lcdHecho2 = "";  // lo que ya se escribio
+
+void lcdIniciar() {
+  static bool wireListo = false;
+  if (!wireListo) { Wire.begin(); wireListo = true; }
+  if (!lcdBuscar()) { if (!lcdAviso) evento("Pantalla LCD no encontrada (revisa SDA/SCL)"); lcdAviso = true; return; }
+  delay(50);
+  lcdConfigurar();
   lcdCmd(0x01);  // borrar
+  lcdHecho1 = lcdHecho2 = "";
   evento("Pantalla LCD en 0x" + String(lcdDir, HEX));
+}
+
+// Cada 5 s: si no estaba, la busca otra vez; si estaba, la reconfigura y reescribe todo.
+void lcdRevisar() {
+  if (!lcdDir) { lcdIniciar(); return; }
+  Wire.beginTransmission(lcdDir);
+  if (Wire.endTransmission() != 0) { lcdDir = 0; evento("Pantalla LCD desconectada"); return; }
+  lcdConfigurar();
+  lcdHecho1 = lcdHecho2 = "";
 }
 
 void lcdLinea(uint8_t fila, String txt) {
   while (txt.length() < 16) txt += ' ';
   txt = txt.substring(0, 16);
-  String& previa = fila ? lcd2 : lcd1;
-  if (txt == previa) return;
-  previa = txt;
-  if (!lcdDir) return;
+  if (fila) lcd2 = txt; else lcd1 = txt;
+  String& hecho = fila ? lcdHecho2 : lcdHecho1;
+  if (!lcdDir || txt == hecho) return;
+  hecho = txt;
   lcdCmd(0x80 | (fila ? 0x40 : 0x00));
   for (uint8_t i = 0; i < 16; i++) lcdByte(txt[i], 1);
 }
 
+// une un texto a la izquierda y otro a la derecha en 16 caracteres
+String lcdDos(String izq, const String& der) {
+  izq = izq.substring(0, 16 - der.length());
+  while (izq.length() + der.length() < 16) izq += ' ';
+  return izq + der;
+}
+
+unsigned long ultimoGiro = 0;
+bool giro = false;
 void actualizarLCD() {
-  if (millis() < MS_CALENTAR_PIR) {
+  unsigned long ahora = millis();
+  // icono del ventilador girando
+  if (lcdDir && vent && ahora - ultimoGiro >= 350) { ultimoGiro = ahora; giro = !giro; lcdIcono(3, giro ? ICO_VENT_B : ICO_VENT_A); }
+
+  if (ahora < MS_CALENTAR_PIR) {   // barra de carga mientras el PIR se prepara
     lcdLinea(0, "ENERGY SENTINEL");
-    lcdLinea(1, "Iniciando PIR " + String((MS_CALENTAR_PIR - millis()) / 1000 + 1) + "s");
+    int n = map(ahora, 0, MS_CALENTAR_PIR, 0, 12);
+    String barra = "PIR ";
+    for (int i = 0; i < 12; i++) barra += (char)(i < n ? 0xFF : '.');
+    lcdLinea(1, barra);
     return;
   }
-  if (estado == 2 && !manual) lcdLinea(0, "APAGA EN " + String(restante()) + "s");
-  else if (estado != 0)        lcdLinea(0, String("AULA OCUPADA ") + (manual ? "MAN" : ""));
-  else                         lcdLinea(0, String(luces ? "LUZ ON (MANUAL)" : "AULA VACIA"));
-  lcdLinea(1, "T:" + (isnan(temperatura) ? String("--.-") : String(temperatura, 1)) + "C VENT:" + (vent ? "ON" : "OFF"));
+  String izq;
+  if (estado == 2 && !manual) izq = String((char)1) + "APAGA " + String(restante()) + "s";
+  else if (estado != 0)       izq = String((char)1) + "OCUPADA" + (manual ? " MAN" : "");
+  else                        izq = luces ? String("LUZ MANUAL") : String("AULA VACIA");
+  lcdLinea(0, lcdDos(izq, String((char)2) + String(lucesOn()) + "/4"));
+
+  String t = isnan(temperatura) ? String("--.-") : String(temperatura, 1);
+  String h = isnan(humedad) ? String("--") : String((int)humedad);
+  lcdLinea(1, lcdDos(t + (char)0xDF + "C H" + h + "%", String((char)3) + (vent ? "ON" : "OFF")));
+}
+
+// el texto de la pantalla para la pagina (los iconos van como \u0001.. y el grado como °)
+String lcdJson(const String& t) {
+  String r = "";
+  for (unsigned i = 0; i < t.length(); i++) {
+    uint8_t c = (uint8_t)t[i];
+    if (c < 32) { r += "\\u000"; r += String(c); }
+    else if (c == 0xDF) r += "\\u00b0";
+    else if (c == 0xFF) r += "\\u2588";
+    else if (c == '"' || c == '\\') { r += '\\'; r += (char)c; }
+    else r += (char)c;
+  }
+  return r;
+}
+
+// ================== MATRIZ DE LEDS DE LA PLACA (12x8) ==================
+// Muestra un dibujo: ventilador girando, foco (luces encendidas) o luna (modo ahorro).
+ArduinoLEDMatrix matriz;
+const char* DIB_FOCO[8]   = {"....XXXX....", "...X....X...", "..X..XX..X..", "..X.X....X..", "...X....X...", "....XXXX....", "....XXXX....", ".....XX....."};
+const char* DIB_LUNA[8]   = {".....XXX....", "...XXX......", "..XXX....X..", "..XX....XXX.", "..XX.....X..", "..XXX.......", "...XXX......", ".....XXX...."};
+const char* DIB_VENT_A[8] = {".....XX.....", ".....XX.....", ".....XX.....", "..XXXXXXXX..", "..XXXXXXXX..", ".....XX.....", ".....XX.....", ".....XX....."};
+const char* DIB_VENT_B[8] = {"..XX....XX..", "...XX..XX...", "....XXXX....", ".....XX.....", ".....XX.....", "....XXXX....", "...XX..XX...", "..XX....XX.."};
+const char* DIB_PIR[8]    = {"............", "....XXXX....", "...X....X...", "..X..XX..X..", "..X..XX..X..", "...X....X...", "....XXXX....", "............"};
+uint8_t cuadro[8][12];
+const char** dibujoActual = nullptr;
+unsigned long ultimoCuadro = 0;
+bool fase = false;
+
+void dibujar(const char** d) {
+  if (d == dibujoActual) return;
+  dibujoActual = d;
+  for (int f = 0; f < 8; f++) for (int c = 0; c < 12; c++) cuadro[f][c] = d[f][c] == 'X';
+  matriz.renderBitmap(cuadro, 8, 12);
+}
+
+void actualizarMatriz() {
+  unsigned long ahora = millis();
+  if (ahora - ultimoCuadro < 250) return;
+  ultimoCuadro = ahora;
+  fase = !fase;
+  if (ahora < MS_CALENTAR_PIR) dibujar(fase ? DIB_PIR : DIB_FOCO);   // preparando
+  else if (vent)  dibujar(fase ? DIB_VENT_A : DIB_VENT_B);
+  else if (luces) dibujar(DIB_FOCO);
+  else            dibujar(DIB_LUNA);
 }
 
 // ================== COMANDOS ==================
@@ -226,6 +361,18 @@ String ejecutar(String cmd) {
   if (up == "LUZ_ON" || up == "LUZ ON")   { manual = true; ponerLuces(true);  evento("Orden: encender luces"); return "OK"; }
   if (up == "LUZ_OFF" || up == "LUZ OFF") { manual = true; ponerLuces(false); evento("Orden: apagar luces"); return "OK"; }
   if (up == "AUTO") { manual = false; evento("Orden: modo automatico"); ponerLuces(estado != 0); return "OK"; }
+  // una luz sola: LUZ1_ON, LUZ3_OFF, "LUZ 2 ON"...
+  if (up.startsWith("LUZ") && up.length() >= 7) {
+    String r = up.substring(3); r.replace("_", " "); r.trim();
+    int n = r.toInt();
+    if (n >= 1 && n <= 4) {
+      bool on = r.endsWith("ON");
+      if (!on && !r.endsWith("OFF")) return "ERROR usa LUZ1_ON o LUZ1_OFF";
+      manual = true; ponerLuz(n - 1, on);
+      evento("Orden: luz " + String(n) + (on ? " encendida" : " apagada") + " (" + String(lucesOn()) + " de 4)");
+      return "OK";
+    }
+  }
   if (up.startsWith("TIEMPO")) {
     long s = up.substring(6).toInt();
     if (s < 5 || s > 600) return "ERROR tiempo 5-600 s";
@@ -258,6 +405,7 @@ String ejecutar(String cmd) {
 String jsonEstado() {
   String j = "{\"t\":\"st\",\"estado\":\"" + String(nombreEstado()) + "\"";
   j += ",\"luces\":" + String(luces ? 1 : 0);
+  j += ",\"lamp\":[" + String(lamp[0]) + "," + String(lamp[1]) + "," + String(lamp[2]) + "," + String(lamp[3]) + "]";
   j += ",\"modo\":\"" + String(manual ? "MANUAL" : "AUTO") + "\"";
   j += ",\"pir\":" + String(pir ? 1 : 0);
   j += ",\"pir_listo\":" + String(millis() > MS_CALENTAR_PIR ? 1 : 0);
@@ -269,7 +417,7 @@ String jsonEstado() {
   j += ",\"consumoWh\":" + String(consumoWh, 2);
   j += ",\"sinSistemaWh\":" + String(sinSistemaWh, 2);
   j += ",\"potencia\":" + String(POTENCIA_W, 0);
-  j += ",\"lcd1\":\"" + lcd1 + "\",\"lcd2\":\"" + lcd2 + "\"";
+  j += ",\"lcd1\":\"" + lcdJson(lcd1) + "\",\"lcd2\":\"" + lcdJson(lcd2) + "\"";
   j += ",\"lcd_ok\":" + String(lcdDir ? 1 : 0);
   j += ",\"ip\":\"" + (wifiOk ? WiFi.localIP().toString() : String("")) + "\"";
   j += ",\"red\":\"" + String(modoAP ? AP_NOMBRE : (wifiOk ? SECRET_SSID : "")) + "\"";
@@ -326,7 +474,7 @@ function t(){const s=prompt('Segundos sin presencia antes de apagar (5-600)','30
 const wh=v=>v>=1000?(v/1000).toFixed(2)+' kWh':v.toFixed(1)+' Wh';
 async function u(){try{const j=await(await fetch('/api/estado')).json();
 e.textContent=(j.estado=='ESPERA'?'ESPERA · apaga en '+j.restante+' s':j.estado=='VACIA'?'DESOCUPADA':'OCUPADA');e.style.background=col[j.estado];
-lcd.textContent=j.lcd1+'\n'+j.lcd2;lu.textContent=(j.luces?'ENCENDIDAS':'APAGADAS')+(j.modo=='MANUAL'?' (man)':'');
+lcd.textContent=(j.lcd1+'\n'+j.lcd2).replace(/[\x01-\x03]/g,' ');lu.textContent=(j.luces?'ENCENDIDAS':'APAGADAS')+(j.modo=='MANUAL'?' (man)':'');
 te.textContent=j.temp==null?'--':j.temp+' °C';co.textContent=wh(j.consumoWh);
 const a=j.sinSistemaWh-j.consumoWh;ah.textContent=wh(Math.max(0,a))+(j.sinSistemaWh>0?' ('+Math.round(a/j.sinSistemaWh*100)+'%)':'');
 const s=j.usoSeg;us.textContent=[s/3600|0,(s/60|0)%60,s%60].map(n=>String(n).padStart(2,'0')).join(':');ti.textContent=j.tiempo+' s';}catch(x){}}
@@ -481,11 +629,10 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_PIR, INPUT);
   pinMode(PIN_DHT, INPUT_PULLUP);
-  pinMode(PIN_LUCES, OUTPUT);
+  for (int i = 0; i < 4; i++) { pinMode(PIN_LUZ[i], OUTPUT); analogWrite(PIN_LUZ[i], 0); }
   pinMode(PIN_LED_OCUPADA, OUTPUT);
   pinMode(PIN_LED_VENT, OUTPUT);
   pinMode(PIN_LED_AHORRO, OUTPUT);
-  digitalWrite(PIN_LUCES, LOW);
   digitalWrite(PIN_RELE_VENT, RELE_ACTIVO_ALTO ? LOW : HIGH);   // ventilador apagado al arrancar
   pinMode(PIN_RELE_VENT, OUTPUT);
   randomSeed(analogRead(A5));
@@ -494,6 +641,9 @@ void setup() {
   lcdIniciar();
   lcdLinea(0, "ENERGY SENTINEL");
   lcdLinea(1, "Detectar.Ahorrar");
+  matriz.begin();
+  dibujar(DIB_FOCO);
+  delay(800);
 
   temaEstado = String("energysentinel/") + CODIGO_AULA + "/estado";
   temaCmd    = String("energysentinel/") + CODIGO_AULA + "/cmd";
@@ -502,6 +652,7 @@ void setup() {
   ultimoTick = millis();
 }
 
+unsigned long ultimoLcdRevision = 0;
 unsigned long ultimoDHT = 0, ultimoLCD = 0, ultimoUSB = 0, ultimoMqtt = 0, ultimoBLE = 0;
 int estadoPrevio = -1;
 
@@ -533,14 +684,18 @@ void loop() {
   }
   digitalWrite(PIN_LED_OCUPADA, estado != 0);   // verde: aula ocupada / en espera
   digitalWrite(PIN_LED_VENT,    vent);          // amarillo: ventilador encendido
-  digitalWrite(PIN_LED_AHORRO,  !luces);        // rojo: ahorro
+  // rojo: ahorro (luces apagadas). "Respira" despacio para que se note
+  if (luces) analogWrite(PIN_LED_AHORRO, 0);
+  else { float f = (sin(ahora / 650.0) + 1) / 2; analogWrite(PIN_LED_AHORRO, 25 + (int)(f * f * 230)); }
+  animarLuces();
+  actualizarMatriz();
 
   // 3) AHORRAR: medir uso y energia cada segundo
   if (ahora - ultimoTick >= 1000) {
     double s = (ahora - ultimoTick) / 1000.0;
     ultimoTick = ahora;
     if (estado != 0) { usoSeg += s; activo = true; }
-    if (luces) consumoWh += POTENCIA_W * s / 3600.0;
+    if (luces) consumoWh += POTENCIA_W * lucesOn() / 4.0 * s / 3600.0;   // cada luz es 1/4 del aula
     if (activo) sinSistemaWh += POTENCIA_W * s / 3600.0;  // sin el sistema la luz quedaria encendida toda la jornada
     if (vent) ventSeg += s;
   }
@@ -550,6 +705,7 @@ void loop() {
     if (!leerDHT11()) { delay(50); leerDHT11(); }
   }
   if (ahora - ultimoLCD >= 300) { ultimoLCD = ahora; actualizarLCD(); }
+  if (ahora - ultimoLcdRevision >= 5000) { ultimoLcdRevision = ahora; lcdRevisar(); }
 
   // 4) IoT
   atenderWeb();
