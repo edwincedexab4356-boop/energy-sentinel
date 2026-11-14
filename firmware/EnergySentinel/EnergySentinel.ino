@@ -15,6 +15,7 @@
     Luces del aula (LED blanco)  D6  -> 220 ohm -> LED (+) ; LED (-) -> GND
     LED verde  (aula ocupada)    D8  -> 220 ohm -> LED -> GND
     LED amarillo (ventilador)    D9  -> 220 ohm -> LED -> GND
+    LED rojo (ahorro)            D10 -> 220 ohm -> LED -> GND   (luces apagadas)
     LCD 16x2 I2C                 VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
                                  (direccion 0x27 o 0x3F: se detecta sola)
 
@@ -64,6 +65,7 @@ const uint8_t PIN_DHT         = 4;
 const uint8_t PIN_LUCES       = 6;
 const uint8_t PIN_LED_OCUPADA = 8;   // verde: aula ocupada (luces encendidas)
 const uint8_t PIN_LED_VENT    = 9;   // amarillo: ventilador encendido
+const uint8_t PIN_LED_AHORRO  = 10;  // rojo: luces apagadas (ahorro)
 const uint8_t PIN_RELE_VENT   = 7;    // modulo rele 5 V -> ventilador
 
 // ================== OPCIONES ==================
@@ -482,6 +484,7 @@ void setup() {
   pinMode(PIN_LUCES, OUTPUT);
   pinMode(PIN_LED_OCUPADA, OUTPUT);
   pinMode(PIN_LED_VENT, OUTPUT);
+  pinMode(PIN_LED_AHORRO, OUTPUT);
   digitalWrite(PIN_LUCES, LOW);
   digitalWrite(PIN_RELE_VENT, RELE_ACTIVO_ALTO ? LOW : HIGH);   // ventilador apagado al arrancar
   pinMode(PIN_RELE_VENT, OUTPUT);
@@ -530,6 +533,7 @@ void loop() {
   }
   digitalWrite(PIN_LED_OCUPADA, estado != 0);   // verde: aula ocupada / en espera
   digitalWrite(PIN_LED_VENT,    vent);          // amarillo: ventilador encendido
+  digitalWrite(PIN_LED_AHORRO,  !luces);        // rojo: ahorro
 
   // 3) AHORRAR: medir uso y energia cada segundo
   if (ahora - ultimoTick >= 1000) {

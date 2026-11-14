@@ -29,6 +29,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 | Luz del aula (LED blanco) | + / − | **D6** (con 220 Ω) / GND |
 | LED verde (aula ocupada) | + / − | **D8** (con 220 Ω) / GND |
 | LED amarillo (ventilador) | + / − | **D9** (con 220 Ω) / GND |
+| LED rojo (ahorro) | + / − | **D10** (con 220 Ω) / GND |
 | LCD 16x2 I2C | VCC / GND / SDA / SCL | 5V / GND / **SDA** / **SCL** |
 
 - El PIR detecta a alguien → se enciende la luz del aula. Sin movimiento durante 30 s → se apaga.
