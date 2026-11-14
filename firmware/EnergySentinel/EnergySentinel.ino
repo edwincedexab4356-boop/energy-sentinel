@@ -7,35 +7,33 @@
     - ArduinoMqttClient (Arduino)
   El DHT11 y la pantalla LCD I2C se manejan con codigo propio (sin librerias).
 
-  CONEXIONES (version con las piezas del grupo)
+  CONEXIONES
+    Sensor PIR HC-SR501          VCC -> 5V   OUT -> D2    GND -> GND
     Sensor DHT11 (temp/humedad)  VCC -> 5V   DATA -> D4   GND -> GND
-    Modulo rele 12 V             VCC -> +12V fuente   GND -> GND comun   IN -> D7
-      (ventilador)               COM -> +12V fuente   NO -> ventilador (+)
-                                 ventilador (-) -> GND fuente
-    Sensor de suelo resistivo    sus 2 pines -> entrada de la sonda del modulo comparador
-    Modulo comparador c/ rele    VCC -> 5V   GND -> GND   AO -> A0   DO -> D3
-      (riego)                    su rele: COM -> +12V   NO -> bomba (+) ; bomba (-) -> GND
-                                 (el punto de "tierra seca" se ajusta con su perilla azul)
-    Luces LED del techo          D6 -> 220 ohm -> LED (+) ; LED (-) -> GND
-    LED verde  (todo normal)     D8  -> 220 ohm -> LED -> GND
+    Modulo rele 5 V              VCC -> 5V   GND -> GND   IN -> D7
+      (ventilador 5 V)           COM -> 5V   NO -> ventilador (+) ; ventilador (-) -> GND
+    Luces del aula (LED blanco)  D6  -> 220 ohm -> LED (+) ; LED (-) -> GND
+    LED verde  (aula ocupada)    D8  -> 220 ohm -> LED -> GND
     LED amarillo (ventilador)    D9  -> 220 ohm -> LED -> GND
-    LED azul  (tierra seca)      D10 -> 220 ohm -> LED -> GND
-    LCD 16x2 I2C (opcional)      VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
-    Sensor PIR (opcional)        OUT -> D2  (poner HAY_PIR = true)
-    Alimentacion: fuente de 12 V -> VIN y GND del Arduino (acepta 6-24 V)
+    LCD 16x2 I2C                 VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
+                                 (direccion 0x27 o 0x3F: se detecta sola)
 
   CONTROL
     - Por USB (Serial 115200): lo usa la pagina web (boton "Conectar Arduino (USB)")
+    - Por Bluetooth (BLE, el que trae la placa; no hace falta HC-05):
+      pagina web -> "Conectar por Bluetooth" (Chrome en Android o en computadora)
+      La placa no usa WiFi y Bluetooth a la vez: se elige con MODO_BLUETOOTH.
     - Por WiFi: panel en http://192.168.4.1 (red propia) o en la IP de tu WiFi
     - Por internet (MQTT): solo si configuras el WiFi de casa
 
   COMANDOS (texto, uno por linea)
     LUZ_ON | LUZ_OFF | AUTO | TIEMPO <seg> | POTENCIA <W> | REINICIAR | ESTADO
-    VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C> | CAL_SECO | CAL_MOJADO
+    VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C>
 */
 
 #include <WiFiS3.h>
 #include <ArduinoMqttClient.h>
+#include <ArduinoBLE.h>
 #include <Wire.h>
 
 // Datos de WiFi: en "arduino_secrets.h" (copia de arduino_secrets.example.h).
@@ -63,17 +61,16 @@ const int  PUERTO   = 1883;
 const uint8_t PIN_PIR         = 2;
 const uint8_t PIN_DHT         = 4;
 const uint8_t PIN_LUCES       = 6;
-const uint8_t PIN_LED_OCUPADA = 8;
-const uint8_t PIN_LED_ESPERA  = 9;
-const uint8_t PIN_LED_AHORRO  = 10;   // en esta version: tierra seca
-const uint8_t PIN_RELE_VENT   = 7;    // modulo rele 12 V -> ventilador
-const uint8_t PIN_SUELO_DO    = 3;    // salida digital del modulo comparador
-#define PIN_SUELO_AO A0               // salida analogica del modulo comparador
+const uint8_t PIN_LED_OCUPADA = 8;   // verde: aula ocupada (luces encendidas)
+const uint8_t PIN_LED_VENT    = 9;   // amarillo: ventilador encendido
+const uint8_t PIN_RELE_VENT   = 7;    // modulo rele 5 V -> ventilador
 
-// ================== PIEZAS DISPONIBLES ==================
-const bool HAY_PIR = false;           // true cuando se conecte un sensor PIR en D2
-const bool HAY_SUELO_AO = true;       // false si el modulo comparador no tiene pin AO
-// Logica del rele: true = se activa con HIGH (jumper en H). Si funciona al reves, pon false.
+// ================== OPCIONES ==================
+// true  = Bluetooth (BLE) + USB.   false = WiFi / internet (MQTT) + USB.
+const bool MODO_BLUETOOTH = true;
+const char BLE_NOMBRE[] = "EnergySentinel";
+const bool HAY_PIR = true;
+// Logica del rele: true = se activa con HIGH. Si el ventilador funciona al reves, pon false.
 const bool RELE_ACTIVO_ALTO = true;
 
 // ================== AJUSTES ==================
@@ -82,7 +79,6 @@ unsigned long tiempoApagadoMs = 30000UL;   // tiempo sin presencia antes de apag
 const unsigned long MS_CALENTAR_PIR = HAY_PIR ? 30000UL : 0;  // el PIR tarda ~30 s en estabilizarse
 float tempVent = 28.0;                     // el ventilador se enciende desde esta temperatura
 const float HISTERESIS = 1.5;              // y se apaga 1.5 C por debajo
-int sueloSeco = 1000, sueloMojado = 350;   // lecturas de A0 en tierra seca y mojada (calibrables)
 
 // ================== ESTADO ==================
 // 0 = VACIA, 1 = OCUPADA, 2 = ESPERA (cuenta atras)
@@ -92,8 +88,7 @@ float temperatura = NAN, humedad = NAN;
 unsigned long ultimoMovimiento = 0, ultimoTick = 0;
 double usoSeg = 0, consumoWh = 0, sinSistemaWh = 0;
 String lcd1 = "", lcd2 = "";
-bool vent = false, ventManual = false, sueloSecoDO = false;
-int sueloRaw = -1;
+bool vent = false, ventManual = false, bleConectado = false;
 double ventSeg = 0;
 
 WiFiServer servidor(80);
@@ -131,21 +126,6 @@ void ponerVent(bool on) {
   vent = on;
   digitalWrite(PIN_RELE_VENT, (on == RELE_ACTIVO_ALTO) ? HIGH : LOW);
   evento(String("Ventilador ") + (on ? "encendido" : "apagado") + (ventManual ? " (manual)" : " (automatico)"));
-}
-
-int sueloPct() {
-  if (!HAY_SUELO_AO || sueloRaw < 0) return -1;
-  long p = map(sueloRaw, sueloSeco, sueloMojado, 0, 100);
-  return p < 0 ? 0 : (p > 100 ? 100 : p);
-}
-
-void leerSuelo() {
-  if (HAY_SUELO_AO) { long t = 0; for (int i = 0; i < 8; i++) t += analogRead(PIN_SUELO_AO); sueloRaw = t / 8; }
-  bool seco = digitalRead(PIN_SUELO_DO) == HIGH;   // comparador LM393: HIGH = tierra seca
-  if (seco != sueloSecoDO) {
-    sueloSecoDO = seco;
-    evento(seco ? "Tierra seca: el modulo comparador activa el riego" : "Tierra humeda: riego detenido");
-  }
 }
 
 // ================== DHT11 (sin libreria) ==================
@@ -223,10 +203,10 @@ void actualizarLCD() {
     lcdLinea(1, "Iniciando PIR " + String((MS_CALENTAR_PIR - millis()) / 1000 + 1) + "s");
     return;
   }
-  lcdLinea(0, "T:" + (isnan(temperatura) ? String("--.-") : String(temperatura, 1)) + "C H:" +
-              (isnan(humedad) ? String("--") : String(humedad, 0)) + "%");
-  int p = sueloPct();
-  lcdLinea(1, "SUELO:" + (p < 0 ? String(sueloSecoDO ? "SECO" : "OK") : String(p) + "%") + " V:" + (vent ? "ON" : "OFF"));
+  if (estado == 2 && !manual) lcdLinea(0, "APAGA EN " + String(restante()) + "s");
+  else if (estado != 0)        lcdLinea(0, String("AULA OCUPADA ") + (manual ? "MAN" : ""));
+  else                         lcdLinea(0, String(luces ? "LUZ ON (MANUAL)" : "AULA VACIA"));
+  lcdLinea(1, "T:" + (isnan(temperatura) ? String("--.-") : String(temperatura, 1)) + "C VENT:" + (vent ? "ON" : "OFF"));
 }
 
 // ================== COMANDOS ==================
@@ -264,8 +244,7 @@ String ejecutar(String cmd) {
     if (t < 15 || t > 45) return "ERROR temperatura 15-45 C";
     tempVent = t; evento("Ventilador se enciende desde " + String(t, 1) + " C"); return "OK";
   }
-  if (up == "CAL_SECO")   { leerSuelo(); sueloSeco = sueloRaw;   evento("Calibrado: tierra seca = " + String(sueloRaw)); return "OK"; }
-  if (up == "CAL_MOJADO") { leerSuelo(); sueloMojado = sueloRaw; evento("Calibrado: tierra mojada = " + String(sueloRaw)); return "OK"; }
+
   return "ERROR comando desconocido";
 }
 
@@ -293,10 +272,7 @@ String jsonEstado() {
   j += ",\"vent_modo\":\"" + String(ventManual ? "MANUAL" : "AUTO") + "\"";
   j += ",\"temp_vent\":" + String(tempVent, 1);
   j += ",\"ventSeg\":" + String((long)ventSeg);
-  int sp = sueloPct();
-  j += ",\"suelo\":" + (sp < 0 ? String("null") : String(sp));
-  j += ",\"suelo_raw\":" + String(sueloRaw);
-  j += ",\"suelo_seco\":" + String(sueloSecoDO ? 1 : 0);
+  j += ",\"ble\":" + String(bleConectado ? 1 : 0);
   j += "}";
   return j;
 }
@@ -390,6 +366,57 @@ void atenderWeb() {
   cli.stop();
 }
 
+// ================== BLUETOOTH (BLE, servicio tipo "UART") ==================
+// La pagina escribe ordenes en RX y recibe el estado por TX (lineas JSON en trozos de 20 bytes).
+BLEService bleServicio("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+BLECharacteristic bleRx("6E400002-B5A3-F393-E0A9-E50E24DCCA9E", BLEWrite | BLEWriteWithoutResponse, 64);
+BLECharacteristic bleTx("6E400003-B5A3-F393-E0A9-E50E24DCCA9E", BLENotify, 20);
+bool bleOk = false;
+String bleBuf = "";
+
+void iniciarBLE() {
+  if (!BLE.begin()) { evento("Bluetooth no disponible"); return; }
+  BLE.setLocalName(BLE_NOMBRE);
+  BLE.setDeviceName(BLE_NOMBRE);
+  BLE.setAdvertisedService(bleServicio);
+  bleServicio.addCharacteristic(bleRx);
+  bleServicio.addCharacteristic(bleTx);
+  BLE.addService(bleServicio);
+  BLE.advertise();
+  bleOk = true;
+  evento(String("Bluetooth listo: busca '") + BLE_NOMBRE + "'");
+}
+
+void bleEnviar(const String& linea) {
+  if (!bleConectado || !bleTx.subscribed()) return;
+  String t = linea + "\n";
+  for (unsigned i = 0; i < t.length(); i += 20) {
+    String trozo = t.substring(i, i + 20);
+    bleTx.writeValue((const uint8_t*)trozo.c_str(), trozo.length());
+  }
+}
+
+void atenderBLE() {
+  if (!bleOk) return;
+  BLE.poll();
+  bool c = BLE.connected();
+  if (c != bleConectado) { bleConectado = c; evento(c ? "Bluetooth conectado" : "Bluetooth desconectado"); }
+  if (bleRx.written()) {
+    int n = bleRx.valueLength();
+    const uint8_t* v = bleRx.value();
+    for (int i = 0; i < n; i++) {
+      char ch = (char)v[i];
+      if (ch == '\n' || ch == '\r') continue;
+      bleBuf += ch;
+    }
+    if (bleBuf.length()) {
+      String r = ejecutar(bleBuf);
+      bleEnviar("{\"t\":\"resp\",\"cmd\":\"" + bleBuf + "\",\"r\":\"" + r + "\"}");
+      bleBuf = "";
+    }
+  }
+}
+
 // ================== MQTT (internet) ==================
 void alRecibir(int) {
   String c = "";
@@ -448,12 +475,10 @@ void setup() {
   pinMode(PIN_DHT, INPUT_PULLUP);
   pinMode(PIN_LUCES, OUTPUT);
   pinMode(PIN_LED_OCUPADA, OUTPUT);
-  pinMode(PIN_LED_ESPERA, OUTPUT);
-  pinMode(PIN_LED_AHORRO, OUTPUT);
+  pinMode(PIN_LED_VENT, OUTPUT);
   digitalWrite(PIN_LUCES, LOW);
   digitalWrite(PIN_RELE_VENT, RELE_ACTIVO_ALTO ? LOW : HIGH);   // ventilador apagado al arrancar
   pinMode(PIN_RELE_VENT, OUTPUT);
-  pinMode(PIN_SUELO_DO, INPUT_PULLUP);
   randomSeed(analogRead(A5));
 
   lcdIniciar();
@@ -463,11 +488,11 @@ void setup() {
   temaEstado = String("energysentinel/") + CODIGO_AULA + "/estado";
   temaCmd    = String("energysentinel/") + CODIGO_AULA + "/cmd";
   evento("Energy Sentinel iniciado");
-  iniciarWiFi();
+  if (MODO_BLUETOOTH) iniciarBLE(); else iniciarWiFi();
   ultimoTick = millis();
 }
 
-unsigned long ultimoDHT = 0, ultimoLCD = 0, ultimoUSB = 0, ultimoMqtt = 0;
+unsigned long ultimoDHT = 0, ultimoLCD = 0, ultimoUSB = 0, ultimoMqtt = 0, ultimoBLE = 0;
 int estadoPrevio = -1;
 
 void loop() {
@@ -494,9 +519,8 @@ void loop() {
     else if (temperatura >= tempVent) ponerVent(true);
     else if (temperatura <= tempVent - HISTERESIS) ponerVent(false);
   }
-  digitalWrite(PIN_LED_OCUPADA, !vent && !sueloSecoDO);   // verde: todo normal
-  digitalWrite(PIN_LED_ESPERA,  vent);                    // amarillo: ventilador encendido
-  digitalWrite(PIN_LED_AHORRO,  sueloSecoDO);             // azul: tierra seca (regando)
+  digitalWrite(PIN_LED_OCUPADA, estado != 0);   // verde: aula ocupada / en espera
+  digitalWrite(PIN_LED_VENT,    vent);          // amarillo: ventilador encendido
 
   // 3) AHORRAR: medir uso y energia cada segundo
   if (ahora - ultimoTick >= 1000) {
@@ -506,7 +530,6 @@ void loop() {
     if (luces) consumoWh += POTENCIA_W * s / 3600.0;
     if (activo) sinSistemaWh += POTENCIA_W * s / 3600.0;  // sin el sistema la luz quedaria encendida toda la jornada
     if (vent) ventSeg += s;
-    leerSuelo();
   }
 
   if (ahora - ultimoDHT >= 3000) {
@@ -524,5 +547,7 @@ void loop() {
       if (ahora - ultimoMqtt >= 2000) { ultimoMqtt = ahora; publicarMqtt(); }
     }
   }
+  atenderBLE();
+  if (bleConectado && ahora - ultimoBLE >= 1000) { ultimoBLE = ahora; bleEnviar(jsonEstado()); }
   if (ahora - ultimoUSB >= 500) { ultimoUSB = ahora; Serial.println(jsonEstado()); }
 }

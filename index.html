@@ -107,7 +107,8 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
     <div class="lema">Detectar · Automatizar · Ahorrar</div>
   </div>
   <div class="ods"><b>ODS 7</b> · Energía asequible y no contaminante</div>
-  <button class="btn pri" id="bUsb">🔌 Conectar Arduino (USB)</button>
+  <button class="btn pri" id="bBle">📶 Conectar por Bluetooth</button>
+  <button class="btn" id="bUsb">🔌 Conectar Arduino (USB)</button>
 </header>
 
 <nav class="tabs" role="tablist">
@@ -232,18 +233,16 @@ Detectar.Ahorrar</div>
     </div>
 
     <div class="card">
-      <h2>Ventilador y riego <span class="der pill" id="climaFuente">solo con el Arduino real</span></h2>
+      <h2>Ventilador <span class="der pill" id="climaFuente">solo con el Arduino real</span></h2>
       <div class="kpis">
-        <div class="kpi"><div class="l">Ventilador (relé 12 V)</div><div class="v" id="kVent">--</div><div class="s" id="kVentS">se enciende desde 28 °C</div></div>
-        <div class="kpi"><div class="l">Humedad del suelo</div><div class="v" id="kSuelo">--</div><div class="s" id="kSueloS">sensor resistivo + comparador</div></div>
+        <div class="kpi"><div class="l">Ventilador (relé 5 V)</div><div class="v" id="kVent">--</div><div class="s" id="kVentS">se enciende desde 28 °C</div></div>
       </div>
       <div class="remoto" role="group" aria-label="Control del ventilador">
         <button class="btn" id="vOn" disabled>🌀 Encender</button>
         <button class="btn" id="vOff" disabled>⏹ Apagar</button>
         <button class="btn" id="vAuto" disabled>🌡 Automático</button>
       </div>
-      <div class="fila"><span>Encender el ventilador desde</span><input type="number" id="iTempVent" value="28" min="15" max="45" step="0.5" disabled style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>°C</span>
-        <button class="btn" id="bCalSeco" disabled style="margin-left:auto;padding:4px 10px">Calibrar seco</button><button class="btn" id="bCalMojado" disabled style="padding:4px 10px">Calibrar mojado</button></div>
+      <div class="fila"><span>Encender el ventilador desde</span><input type="number" id="iTempVent" value="28" min="15" max="45" step="0.5" disabled style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>°C</span></div>
     </div>
 
     <div class="card">
@@ -256,11 +255,16 @@ Detectar.Ahorrar</div>
 
 <section class="vista card txt" id="v-real" hidden>
   <h2>Conectar la maqueta real</h2>
-  <p>El Arduino UNO R4 WiFi se puede controlar de tres formas. En todas, el panel de la pestaña <b>Simulador y panel</b> muestra los datos reales y los botones de <b>Control remoto</b> mandan la orden al Arduino.</p>
+  <p>El Arduino UNO R4 WiFi se puede controlar de varias formas. En todas, el panel de la pestaña <b>Simulador y panel</b> muestra los datos reales y los botones de <b>Control remoto</b> mandan la orden al Arduino.</p>
 
   <h3>1 · Por cable USB (computadora)</h3>
   <p>Conecta el Arduino a la computadora, abre esta página en <b>Google Chrome o Microsoft Edge</b> y pulsa el botón. Elige el puerto “Arduino UNO R4 WiFi”. Cierra antes el Monitor Serie del Arduino IDE: solo un programa puede usar el puerto a la vez.</p>
   <div class="campo"><button class="btn pri" id="bUsb2">🔌 Conectar Arduino (USB)</button><span class="pill" id="estadoUsb">desconectado</span></div>
+
+  <h3>Por Bluetooth (celular Android o computadora) · recomendado</h3>
+  <p>La placa trae Bluetooth propio: <b>no hace falta el módulo HC-05</b>. Abre esta página en <b>Google Chrome</b> (Android, Windows o Mac), activa el Bluetooth, pulsa el botón y elige <b>EnergySentinel</b>. En iPhone el navegador no permite Bluetooth.</p>
+  <div class="campo"><button class="btn pri" id="bBle2">📶 Conectar por Bluetooth</button><span class="pill" id="estadoBle">desconectado</span></div>
+  <p style="color:var(--dim);font-size:13px">El Arduino usa Bluetooth <b>o</b> WiFi, no los dos a la vez. Para usar WiFi o internet, en el programa cambia <code>MODO_BLUETOOTH</code> a <code>false</code>.</p>
 
   <h3>2 · Por la red WiFi del Arduino (celular)</h3>
   <p>El Arduino crea su propia red WiFi <b>EnergySentinel</b> (clave <code>aula12345</code>). Conéctate a ella desde el celular y abre <b>http://192.168.4.1</b>: ahí hay un panel con los mismos botones.</p>
@@ -286,17 +290,13 @@ Detectar.Ahorrar</div>
   <h3>Conexiones</h3>
   <table>
     <tr><th>Componente</th><th>Pines del módulo</th><th>Arduino</th><th>Notas</th></tr>
+    <tr><td>Sensor PIR HC-SR501</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Detecta personas y enciende la luz del aula. Tarda ~30 s en activarse</td></tr>
     <tr><td>Sensor DHT11 (temperatura y humedad)</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Controla el ventilador</td></tr>
-    <tr><td>Módulo relé 12 V (ventilador)</td><td>VCC / GND / IN</td><td>+12V fuente / GND común / <b>D7</b></td><td>Jumper en <b>H</b> si lo tiene. COM → +12V, NO → ventilador (+); ventilador (−) → GND de la fuente</td></tr>
-    <tr><td>Módulo comparador con relé (riego)</td><td>VCC / GND / AO / DO</td><td>5V / GND / <b>A0</b> / <b>D3</b></td><td>La sonda de suelo va a su entrada. Su relé: COM → +12V, NO → bomba (+). El punto de "seco" se ajusta con su perilla</td></tr>
-    <tr><td>Sensor de humedad de suelo resistivo</td><td>2 pines</td><td>al módulo comparador</td><td>Se entierra en la maceta</td></tr>
-    <tr><td>Luces LED del techo</td><td>+ / −</td><td><b>D6</b> / GND</td><td>220 Ω · se controlan desde la página</td></tr>
-    <tr><td>LED verde (todo normal)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>Módulo relé 5 V (ventilador)</td><td>VCC / GND / IN</td><td>5V / GND / <b>D7</b></td><td>COM → 5V, NO → ventilador (+); ventilador (−) → GND</td></tr>
+    <tr><td>Luz del aula (LED blanco)</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 220 Ω</td></tr>
+    <tr><td>LED verde (aula ocupada)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
     <tr><td>LED amarillo (ventilador)</td><td>+ / −</td><td><b>D9</b> / GND</td><td>220 Ω</td></tr>
-    <tr><td>LED azul (tierra seca)</td><td>+ / −</td><td><b>D10</b> / GND</td><td>220 Ω</td></tr>
-    <tr><td>LCD 16x2 I2C (opcional)</td><td>VCC / GND / SDA / SCL</td><td>5V / GND / <b>SDA</b> / <b>SCL</b></td><td>Dirección 0x27 o 0x3F: se detecta sola</td></tr>
-    <tr><td>Fuente de 12 V</td><td>+ / −</td><td><b>VIN</b> / GND</td><td>Alimenta Arduino, relé, ventilador y bomba. Todos los GND unidos</td></tr>
-    <tr><td>Sensor PIR (opcional)</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Si se agrega, poner <code>HAY_PIR = true</code></td></tr>
+    <tr><td>LCD 16x2 I2C</td><td>VCC / GND / SDA / SCL</td><td>5V / GND / <b>SDA</b> / <b>SCL</b></td><td>Dirección 0x27 o 0x3F: se detecta sola</td></tr>
   </table>
   <h3>Programa</h3>
   <pre class="codigo" id="codigo">Cargando…</pre>
@@ -621,23 +621,27 @@ function modoReal(fuente, etiqueta){
   $('wifiTxt').textContent='esperando datos…';
   document.querySelectorAll('#ctrlSim button:not(#bReset), #vel button').forEach(b=>b.disabled=true);
   $('bDesconectar').disabled=false;
+  if (fuente!=='ble' && bleDisp) { cerrarBle(); setBle('desconectado'); }
 }
 async function desconectar(){
   if (cliente) { cliente.end(true); cliente=null; }
-  const eraUsb = S.fuente==='usb';
+  const eraUsb = S.fuente==='usb', eraBle = S.fuente==='ble';
   S.fuente='sim';
   if (eraUsb) await cerrarUsb();
+  if (eraBle) cerrarBle();
+  setBle('desconectado');
   setMqtt('desconectado'); setUsb('desconectado');
   $('modoFuente').textContent='Simulación'; $('modoFuente').className='pill';
   $('remotoDestino').textContent='a la simulación'; $('wifiTxt').textContent='WiFi · enviando datos'; $('ultima').textContent='';
   document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=false);
   $('bDesconectar').disabled=true; $('bConectar').textContent='Conectar';
-  ['vOn','vOff','vAuto','iTempVent','bCalSeco','bCalMojado'].forEach(id=>$(id).disabled=true);
-  $('climaFuente').textContent='solo con el Arduino real'; $('kVent').textContent='--'; $('kSuelo').textContent='--'; ventAntes=null;
+  ['vOn','vOff','vAuto','iTempVent'].forEach(id=>$(id).disabled=true);
+  $('climaFuente').textContent='solo con el Arduino real'; $('kVent').textContent='--'; ventAntes=null;
   reiniciar(true); log('De vuelta a la simulación');
 }
 function enviar(cmd){
   if (S.fuente==='usb') { if (escritor) escritor.write(cmd+'\n').catch(()=>{}); return; }
+  if (S.fuente==='ble') { if (bleRx) bleCola = bleCola.then(()=>bleRx.writeValue(new TextEncoder().encode(cmd))).catch(()=>{}); return; }
   if (cliente && cliente.connected) cliente.publish(tema+'/cmd', cmd);
 }
 
@@ -680,7 +684,7 @@ async function leerUsb(p){
 function lineaUsb(l){
   if (!l.startsWith('{')) return;
   let j; try { j = JSON.parse(l); } catch { return; }
-  if (j.t==='st') { recibir(j); $('wifiTxt').textContent = j.ip ? 'WiFi '+(j.red||'')+' · http://'+j.ip : 'USB · en línea'; }
+  if (j.t==='st') { recibir(j); $('wifiTxt').textContent = S.fuente==='ble' ? 'Bluetooth · en línea' : j.ip ? 'WiFi '+(j.red||'')+' · http://'+j.ip : 'USB · en línea'; }
   else if (j.t==='ev') log('Arduino: '+String(j.msg).replace(/</g,'&lt;'));
   else if (j.t==='resp' && j.r!=='OK') log(j.cmd+' → '+j.r);
 }
@@ -692,6 +696,42 @@ async function cerrarUsb(){
   await new Promise(r=>setTimeout(r,50));
   try { if (p) await p.close(); } catch {}
 }
+/* ---------- Bluetooth (Web Bluetooth, servicio tipo UART) ---------- */
+const BLE_SRV = '6e400001-b5a3-f393-e0a9-e50e24dcca9e', BLE_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e', BLE_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+let bleDisp = null, bleRx = null, bleCola = Promise.resolve();
+function setBle(txt, cls){
+  const p=$('estadoBle'); p.textContent=txt; p.className='pill '+(cls||'');
+  const t = S.fuente==='ble' ? '⏏ Desconectar Bluetooth' : '📶 Conectar por Bluetooth';
+  $('bBle').textContent = t; $('bBle2').textContent = t;
+}
+function cerrarBle(){ const d=bleDisp; bleDisp=null; bleRx=null; try{ if (d && d.gatt.connected) d.gatt.disconnect(); }catch{} }
+async function conectarBle(){
+  if (S.fuente==='ble') { desconectar(); return; }
+  if (!navigator.bluetooth) { alert('Este navegador no permite Bluetooth. Usa Google Chrome en Android o en una computadora (en iPhone no funciona).'); return; }
+  let disp;
+  try {
+    disp = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_SRV] }, { name: 'EnergySentinel' }], optionalServices: [BLE_SRV] });
+    setBle('conectando…');
+    const srv = await (await disp.gatt.connect()).getPrimaryService(BLE_SRV);
+    const tx = await srv.getCharacteristic(BLE_TX);
+    bleRx = await srv.getCharacteristic(BLE_RX);
+    let buf = '';
+    tx.addEventListener('characteristicvaluechanged', e => {
+      buf += new TextDecoder().decode(e.target.value); let i;
+      while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0,i).trim(); buf = buf.slice(i+1); lineaUsb(l); }
+    });
+    await tx.startNotifications();
+  } catch (e) { bleRx = null; setBle(e.name==='NotFoundError' ? 'desconectado' : 'no se pudo conectar','err'); if (e.name!=='NotFoundError') log('Bluetooth: '+e.message); return; }
+  if (cliente) { cliente.end(true); cliente=null; setMqtt('desconectado'); }
+  if (S.fuente==='usb') { await cerrarUsb(); setUsb('desconectado'); }
+  bleDisp = disp;
+  disp.addEventListener('gattserverdisconnected', ()=>{ if (S.fuente==='ble' && bleDisp===disp) { log('Bluetooth desconectado'); desconectar(); } });
+  modoReal('ble','Arduino real · Bluetooth');
+  setBle('conectado por Bluetooth','ok');
+  log('Conectado al Arduino por <b>Bluetooth</b>');
+}
+$('bBle').onclick = conectarBle;
+$('bBle2').onclick = conectarBle;
 $('bUsb').onclick = conectarUsb;
 $('bUsb2').onclick = conectarUsb;
 let personaReal = null;
@@ -725,13 +765,11 @@ function clima(d){
   $('kVent').textContent = d.vent ? 'ENCENDIDO' : 'APAGADO';
   const m = (d.ventSeg|0), hh = String(m/3600|0).padStart(2,'0'), mm = String((m/60|0)%60).padStart(2,'0');
   $('kVentS').textContent = (man ? 'manual' : 'automático: desde '+d.temp_vent+' °C') + ' · uso '+hh+':'+mm;
-  $('kSuelo').textContent = d.suelo == null ? (d.suelo_seco ? 'SECO' : 'HÚMEDO') : d.suelo+' %';
-  $('kSueloS').textContent = d.suelo_seco ? 'tierra seca → el módulo comparador riega' : 'tierra húmeda → sin riego';
   if (document.activeElement !== $('iTempVent')) $('iTempVent').value = d.temp_vent;
   $('vOn').setAttribute('aria-pressed', String(man && !!d.vent));
   $('vOff').setAttribute('aria-pressed', String(man && !d.vent));
   $('vAuto').setAttribute('aria-pressed', String(!man));
-  ['vOn','vOff','vAuto','iTempVent','bCalSeco','bCalMojado'].forEach(id=>$(id).disabled=false);
+  ['vOn','vOff','vAuto','iTempVent'].forEach(id=>$(id).disabled=false);
   if (ventAntes !== null && ventAntes !== !!d.vent) log('Arduino: ventilador <b>'+(d.vent?'encendido':'apagado')+'</b>');
   ventAntes = !!d.vent;
 }
@@ -740,8 +778,7 @@ $('vOn').onclick = ()=>ordenClima('VENT_ON');
 $('vOff').onclick = ()=>ordenClima('VENT_OFF');
 $('vAuto').onclick = ()=>ordenClima('VENT_AUTO');
 $('iTempVent').onchange = e => { const t = +e.target.value; if (t>=15 && t<=45) ordenClima('TEMP_VENT '+t); };
-$('bCalSeco').onclick = ()=>ordenClima('CAL_SECO');
-$('bCalMojado').onclick = ()=>ordenClima('CAL_MOJADO');
+
 setInterval(()=>{ if (S.fuente!=='sim' && ultimoMsg) { const s=Math.round((Date.now()-ultimoMsg)/1000); $('ultima').textContent = s<5 ? 'en vivo' : 'último dato hace '+s+' s'; if (s>10) { $('wifiTxt').textContent='sin datos del Arduino'; } } }, 1000);
 $('bConectar').onclick = conectar;
 $('bDesconectar').onclick = desconectar;
