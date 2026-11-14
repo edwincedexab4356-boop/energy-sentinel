@@ -232,6 +232,21 @@ Detectar.Ahorrar</div>
     </div>
 
     <div class="card">
+      <h2>Ventilador y riego <span class="der pill" id="climaFuente">solo con el Arduino real</span></h2>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Ventilador (relé 12 V)</div><div class="v" id="kVent">--</div><div class="s" id="kVentS">se enciende desde 28 °C</div></div>
+        <div class="kpi"><div class="l">Humedad del suelo</div><div class="v" id="kSuelo">--</div><div class="s" id="kSueloS">sensor resistivo + comparador</div></div>
+      </div>
+      <div class="remoto" role="group" aria-label="Control del ventilador">
+        <button class="btn" id="vOn" disabled>🌀 Encender</button>
+        <button class="btn" id="vOff" disabled>⏹ Apagar</button>
+        <button class="btn" id="vAuto" disabled>🌡 Automático</button>
+      </div>
+      <div class="fila"><span>Encender el ventilador desde</span><input type="number" id="iTempVent" value="28" min="15" max="45" step="0.5" disabled style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>°C</span>
+        <button class="btn" id="bCalSeco" disabled style="margin-left:auto;padding:4px 10px">Calibrar seco</button><button class="btn" id="bCalMojado" disabled style="padding:4px 10px">Calibrar mojado</button></div>
+    </div>
+
+    <div class="card">
       <h2>Registro de eventos</h2>
       <ul class="log" id="log"></ul>
     </div>
@@ -271,13 +286,17 @@ Detectar.Ahorrar</div>
   <h3>Conexiones</h3>
   <table>
     <tr><th>Componente</th><th>Pines del módulo</th><th>Arduino</th><th>Notas</th></tr>
-    <tr><td>Sensor PIR HC-SR501</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Tarda ~30 s en activarse al encender</td></tr>
-    <tr><td>Sensor DHT11</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Temperatura y humedad</td></tr>
-    <tr><td>Luces LED del techo</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 220 Ω; muchos LEDs o lámpara → módulo relé</td></tr>
-    <tr><td>LED verde (ocupada)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
-    <tr><td>LED amarillo (temporizador)</td><td>+ / −</td><td><b>D9</b> / GND</td><td>220 Ω</td></tr>
-    <tr><td>LED azul (ahorro)</td><td>+ / −</td><td><b>D10</b> / GND</td><td>220 Ω</td></tr>
-    <tr><td>LCD 16x2 I2C</td><td>VCC / GND / SDA / SCL</td><td>5V / GND / <b>SDA</b> / <b>SCL</b></td><td>Dirección 0x27 o 0x3F: se detecta sola</td></tr>
+    <tr><td>Sensor DHT11 (temperatura y humedad)</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Controla el ventilador</td></tr>
+    <tr><td>Módulo relé 12 V (ventilador)</td><td>VCC / GND / IN</td><td>+12V fuente / GND común / <b>D7</b></td><td>Jumper en <b>H</b> si lo tiene. COM → +12V, NO → ventilador (+); ventilador (−) → GND de la fuente</td></tr>
+    <tr><td>Módulo comparador con relé (riego)</td><td>VCC / GND / AO / DO</td><td>5V / GND / <b>A0</b> / <b>D3</b></td><td>La sonda de suelo va a su entrada. Su relé: COM → +12V, NO → bomba (+). El punto de "seco" se ajusta con su perilla</td></tr>
+    <tr><td>Sensor de humedad de suelo resistivo</td><td>2 pines</td><td>al módulo comparador</td><td>Se entierra en la maceta</td></tr>
+    <tr><td>Luces LED del techo</td><td>+ / −</td><td><b>D6</b> / GND</td><td>220 Ω · se controlan desde la página</td></tr>
+    <tr><td>LED verde (todo normal)</td><td>+ / −</td><td><b>D8</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LED amarillo (ventilador)</td><td>+ / −</td><td><b>D9</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LED azul (tierra seca)</td><td>+ / −</td><td><b>D10</b> / GND</td><td>220 Ω</td></tr>
+    <tr><td>LCD 16x2 I2C (opcional)</td><td>VCC / GND / SDA / SCL</td><td>5V / GND / <b>SDA</b> / <b>SCL</b></td><td>Dirección 0x27 o 0x3F: se detecta sola</td></tr>
+    <tr><td>Fuente de 12 V</td><td>+ / −</td><td><b>VIN</b> / GND</td><td>Alimenta Arduino, relé, ventilador y bomba. Todos los GND unidos</td></tr>
+    <tr><td>Sensor PIR (opcional)</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Si se agrega, poner <code>HAY_PIR = true</code></td></tr>
   </table>
   <h3>Programa</h3>
   <pre class="codigo" id="codigo">Cargando…</pre>
@@ -613,6 +632,8 @@ async function desconectar(){
   $('remotoDestino').textContent='a la simulación'; $('wifiTxt').textContent='WiFi · enviando datos'; $('ultima').textContent='';
   document.querySelectorAll('#ctrlSim button, #vel button').forEach(b=>b.disabled=false);
   $('bDesconectar').disabled=true; $('bConectar').textContent='Conectar';
+  ['vOn','vOff','vAuto','iTempVent','bCalSeco','bCalMojado'].forEach(id=>$(id).disabled=true);
+  $('climaFuente').textContent='solo con el Arduino real'; $('kVent').textContent='--'; $('kSuelo').textContent='--'; ventAntes=null;
   reiniciar(true); log('De vuelta a la simulación');
 }
 function enviar(cmd){
@@ -693,8 +714,34 @@ function recibir(d){
   if (S.estado!=='OCUPADA' && personaReal) { const g=personaReal; personaReal=null; mover(g,AFUERA); abrirPuerta(); setTimeout(()=>g.remove(),1200); }
   S.t = Date.now()/1000;
   hist.push({t:S.t,sin:S.sinWh,cons:S.consWh,temp:S.temp}); if (hist.length>400) hist.shift();
-  marcarRemoto(); pintar();
+  marcarRemoto(); pintar(); clima(d);
 }
+/* ---------- Ventilador y riego (Arduino real) ---------- */
+let ventAntes = null;
+function clima(d){
+  if (!('vent' in d)) return;
+  const man = d.vent_modo === 'MANUAL';
+  $('climaFuente').textContent = 'en vivo';
+  $('kVent').textContent = d.vent ? 'ENCENDIDO' : 'APAGADO';
+  const m = (d.ventSeg|0), hh = String(m/3600|0).padStart(2,'0'), mm = String((m/60|0)%60).padStart(2,'0');
+  $('kVentS').textContent = (man ? 'manual' : 'automático: desde '+d.temp_vent+' °C') + ' · uso '+hh+':'+mm;
+  $('kSuelo').textContent = d.suelo == null ? (d.suelo_seco ? 'SECO' : 'HÚMEDO') : d.suelo+' %';
+  $('kSueloS').textContent = d.suelo_seco ? 'tierra seca → el módulo comparador riega' : 'tierra húmeda → sin riego';
+  if (document.activeElement !== $('iTempVent')) $('iTempVent').value = d.temp_vent;
+  $('vOn').setAttribute('aria-pressed', String(man && !!d.vent));
+  $('vOff').setAttribute('aria-pressed', String(man && !d.vent));
+  $('vAuto').setAttribute('aria-pressed', String(!man));
+  ['vOn','vOff','vAuto','iTempVent','bCalSeco','bCalMojado'].forEach(id=>$(id).disabled=false);
+  if (ventAntes !== null && ventAntes !== !!d.vent) log('Arduino: ventilador <b>'+(d.vent?'encendido':'apagado')+'</b>');
+  ventAntes = !!d.vent;
+}
+const ordenClima = c => { if (S.fuente !== 'sim') { enviar(c); log('Orden enviada al Arduino: <b>'+c+'</b>'); } };
+$('vOn').onclick = ()=>ordenClima('VENT_ON');
+$('vOff').onclick = ()=>ordenClima('VENT_OFF');
+$('vAuto').onclick = ()=>ordenClima('VENT_AUTO');
+$('iTempVent').onchange = e => { const t = +e.target.value; if (t>=15 && t<=45) ordenClima('TEMP_VENT '+t); };
+$('bCalSeco').onclick = ()=>ordenClima('CAL_SECO');
+$('bCalMojado').onclick = ()=>ordenClima('CAL_MOJADO');
 setInterval(()=>{ if (S.fuente!=='sim' && ultimoMsg) { const s=Math.round((Date.now()-ultimoMsg)/1000); $('ultima').textContent = s<5 ? 'en vivo' : 'último dato hace '+s+' s'; if (s>10) { $('wifiTxt').textContent='sin datos del Arduino'; } } }, 1000);
 $('bConectar').onclick = conectar;
 $('bDesconectar').onclick = desconectar;

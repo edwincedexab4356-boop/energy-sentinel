@@ -7,16 +7,22 @@
     - ArduinoMqttClient (Arduino)
   El DHT11 y la pantalla LCD I2C se manejan con codigo propio (sin librerias).
 
-  CONEXIONES
-    Sensor PIR HC-SR501   VCC -> 5V    OUT -> D2    GND -> GND
-    Sensor DHT11          VCC -> 5V    DATA -> D4   GND -> GND
-    Luces LED del techo   D6 -> resistencia 220 ohm -> LED (+) ; LED (-) -> GND
-                          (muchos LEDs o una lampara: D6 -> modulo rele / transistor)
-    LED verde  (ocupada)  D8  -> 220 ohm -> LED -> GND
-    LED amarillo (espera) D9  -> 220 ohm -> LED -> GND
-    LED azul  (ahorro)    D10 -> 220 ohm -> LED -> GND
-    LCD 16x2 I2C          VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
-                          (direccion 0x27 o 0x3F: se detecta sola)
+  CONEXIONES (version con las piezas del grupo)
+    Sensor DHT11 (temp/humedad)  VCC -> 5V   DATA -> D4   GND -> GND
+    Modulo rele 12 V             VCC -> +12V fuente   GND -> GND comun   IN -> D7
+      (ventilador)               COM -> +12V fuente   NO -> ventilador (+)
+                                 ventilador (-) -> GND fuente
+    Sensor de suelo resistivo    sus 2 pines -> entrada de la sonda del modulo comparador
+    Modulo comparador c/ rele    VCC -> 5V   GND -> GND   AO -> A0   DO -> D3
+      (riego)                    su rele: COM -> +12V   NO -> bomba (+) ; bomba (-) -> GND
+                                 (el punto de "tierra seca" se ajusta con su perilla azul)
+    Luces LED del techo          D6 -> 220 ohm -> LED (+) ; LED (-) -> GND
+    LED verde  (todo normal)     D8  -> 220 ohm -> LED -> GND
+    LED amarillo (ventilador)    D9  -> 220 ohm -> LED -> GND
+    LED azul  (tierra seca)      D10 -> 220 ohm -> LED -> GND
+    LCD 16x2 I2C (opcional)      VCC -> 5V   GND -> GND   SDA -> SDA   SCL -> SCL
+    Sensor PIR (opcional)        OUT -> D2  (poner HAY_PIR = true)
+    Alimentacion: fuente de 12 V -> VIN y GND del Arduino (acepta 6-24 V)
 
   CONTROL
     - Por USB (Serial 115200): lo usa la pagina web (boton "Conectar Arduino (USB)")
@@ -25,6 +31,7 @@
 
   COMANDOS (texto, uno por linea)
     LUZ_ON | LUZ_OFF | AUTO | TIEMPO <seg> | POTENCIA <W> | REINICIAR | ESTADO
+    VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C> | CAL_SECO | CAL_MOJADO
 */
 
 #include <WiFiS3.h>
@@ -58,12 +65,24 @@ const uint8_t PIN_DHT         = 4;
 const uint8_t PIN_LUCES       = 6;
 const uint8_t PIN_LED_OCUPADA = 8;
 const uint8_t PIN_LED_ESPERA  = 9;
-const uint8_t PIN_LED_AHORRO  = 10;
+const uint8_t PIN_LED_AHORRO  = 10;   // en esta version: tierra seca
+const uint8_t PIN_RELE_VENT   = 7;    // modulo rele 12 V -> ventilador
+const uint8_t PIN_SUELO_DO    = 3;    // salida digital del modulo comparador
+#define PIN_SUELO_AO A0               // salida analogica del modulo comparador
+
+// ================== PIEZAS DISPONIBLES ==================
+const bool HAY_PIR = false;           // true cuando se conecte un sensor PIR en D2
+const bool HAY_SUELO_AO = true;       // false si el modulo comparador no tiene pin AO
+// Logica del rele: true = se activa con HIGH (jumper en H). Si funciona al reves, pon false.
+const bool RELE_ACTIVO_ALTO = true;
 
 // ================== AJUSTES ==================
 float POTENCIA_W = 144.0;                  // aula real equivalente: 8 lamparas LED de 18 W
 unsigned long tiempoApagadoMs = 30000UL;   // tiempo sin presencia antes de apagar
-const unsigned long MS_CALENTAR_PIR = 30000UL;  // el PIR tarda ~30 s en estabilizarse
+const unsigned long MS_CALENTAR_PIR = HAY_PIR ? 30000UL : 0;  // el PIR tarda ~30 s en estabilizarse
+float tempVent = 28.0;                     // el ventilador se enciende desde esta temperatura
+const float HISTERESIS = 1.5;              // y se apaga 1.5 C por debajo
+int sueloSeco = 1000, sueloMojado = 350;   // lecturas de A0 en tierra seca y mojada (calibrables)
 
 // ================== ESTADO ==================
 // 0 = VACIA, 1 = OCUPADA, 2 = ESPERA (cuenta atras)
@@ -73,6 +92,9 @@ float temperatura = NAN, humedad = NAN;
 unsigned long ultimoMovimiento = 0, ultimoTick = 0;
 double usoSeg = 0, consumoWh = 0, sinSistemaWh = 0;
 String lcd1 = "", lcd2 = "";
+bool vent = false, ventManual = false, sueloSecoDO = false;
+int sueloRaw = -1;
+double ventSeg = 0;
 
 WiFiServer servidor(80);
 WiFiClient wifiCliente;
@@ -102,6 +124,28 @@ void ponerLuces(bool on) {
   luces = on;
   digitalWrite(PIN_LUCES, on ? HIGH : LOW);
   evento(String("Luces ") + (on ? "encendidas" : "apagadas") + (manual ? " (manual)" : " (automatico)"));
+}
+
+void ponerVent(bool on) {
+  if (vent == on) return;
+  vent = on;
+  digitalWrite(PIN_RELE_VENT, (on == RELE_ACTIVO_ALTO) ? HIGH : LOW);
+  evento(String("Ventilador ") + (on ? "encendido" : "apagado") + (ventManual ? " (manual)" : " (automatico)"));
+}
+
+int sueloPct() {
+  if (!HAY_SUELO_AO || sueloRaw < 0) return -1;
+  long p = map(sueloRaw, sueloSeco, sueloMojado, 0, 100);
+  return p < 0 ? 0 : (p > 100 ? 100 : p);
+}
+
+void leerSuelo() {
+  if (HAY_SUELO_AO) { long t = 0; for (int i = 0; i < 8; i++) t += analogRead(PIN_SUELO_AO); sueloRaw = t / 8; }
+  bool seco = digitalRead(PIN_SUELO_DO) == HIGH;   // comparador LM393: HIGH = tierra seca
+  if (seco != sueloSecoDO) {
+    sueloSecoDO = seco;
+    evento(seco ? "Tierra seca: el modulo comparador activa el riego" : "Tierra humeda: riego detenido");
+  }
 }
 
 // ================== DHT11 (sin libreria) ==================
@@ -179,18 +223,10 @@ void actualizarLCD() {
     lcdLinea(1, "Iniciando PIR " + String((MS_CALENTAR_PIR - millis()) / 1000 + 1) + "s");
     return;
   }
-  String est = nombreEstado();
-  while (est.length() < 7) est += ' ';
-  lcdLinea(0, "AULA:" + est + " " + (manual ? "MAN" : "AUT"));
-  if (estado == 2 && !manual) {
-    String r = String(restante());
-    while (r.length() < 3) r = " " + r;
-    lcdLinea(1, "APAGA EN " + r + "s");
-  } else if (!luces) {
-    lcdLinea(1, "MODO AHORRO");
-  } else {
-    lcdLinea(1, "LUZ:ON  T:" + (isnan(temperatura) ? String("--.-") : String(temperatura, 1)) + "C");
-  }
+  lcdLinea(0, "T:" + (isnan(temperatura) ? String("--.-") : String(temperatura, 1)) + "C H:" +
+              (isnan(humedad) ? String("--") : String(humedad, 0)) + "%");
+  int p = sueloPct();
+  lcdLinea(1, "SUELO:" + (p < 0 ? String(sueloSecoDO ? "SECO" : "OK") : String(p) + "%") + " V:" + (vent ? "ON" : "OFF"));
 }
 
 // ================== COMANDOS ==================
@@ -220,6 +256,16 @@ String ejecutar(String cmd) {
   }
   if (up == "REINICIAR") { reiniciarContadores(); evento("Contadores de energia reiniciados"); return "OK"; }
   if (up == "ESTADO") return "OK";
+  if (up == "VENT_ON")   { ventManual = true; ponerVent(true);  return "OK"; }
+  if (up == "VENT_OFF")  { ventManual = true; ponerVent(false); return "OK"; }
+  if (up == "VENT_AUTO") { ventManual = false; evento("Ventilador en automatico (desde " + String(tempVent, 1) + " C)"); return "OK"; }
+  if (up.startsWith("TEMP_VENT")) {
+    float t = up.substring(9).toFloat();
+    if (t < 15 || t > 45) return "ERROR temperatura 15-45 C";
+    tempVent = t; evento("Ventilador se enciende desde " + String(t, 1) + " C"); return "OK";
+  }
+  if (up == "CAL_SECO")   { leerSuelo(); sueloSeco = sueloRaw;   evento("Calibrado: tierra seca = " + String(sueloRaw)); return "OK"; }
+  if (up == "CAL_MOJADO") { leerSuelo(); sueloMojado = sueloRaw; evento("Calibrado: tierra mojada = " + String(sueloRaw)); return "OK"; }
   return "ERROR comando desconocido";
 }
 
@@ -242,6 +288,15 @@ String jsonEstado() {
   j += ",\"ip\":\"" + (wifiOk ? WiFi.localIP().toString() : String("")) + "\"";
   j += ",\"red\":\"" + String(modoAP ? AP_NOMBRE : (wifiOk ? SECRET_SSID : "")) + "\"";
   j += ",\"mqtt\":" + String(mqtt.connected() ? 1 : 0);
+  j += ",\"hay_pir\":" + String(HAY_PIR ? 1 : 0);
+  j += ",\"vent\":" + String(vent ? 1 : 0);
+  j += ",\"vent_modo\":\"" + String(ventManual ? "MANUAL" : "AUTO") + "\"";
+  j += ",\"temp_vent\":" + String(tempVent, 1);
+  j += ",\"ventSeg\":" + String((long)ventSeg);
+  int sp = sueloPct();
+  j += ",\"suelo\":" + (sp < 0 ? String("null") : String(sp));
+  j += ",\"suelo_raw\":" + String(sueloRaw);
+  j += ",\"suelo_seco\":" + String(sueloSecoDO ? 1 : 0);
   j += "}";
   return j;
 }
@@ -396,7 +451,10 @@ void setup() {
   pinMode(PIN_LED_ESPERA, OUTPUT);
   pinMode(PIN_LED_AHORRO, OUTPUT);
   digitalWrite(PIN_LUCES, LOW);
-  randomSeed(analogRead(A0));
+  digitalWrite(PIN_RELE_VENT, RELE_ACTIVO_ALTO ? LOW : HIGH);   // ventilador apagado al arrancar
+  pinMode(PIN_RELE_VENT, OUTPUT);
+  pinMode(PIN_SUELO_DO, INPUT_PULLUP);
+  randomSeed(analogRead(A5));
 
   lcdIniciar();
   lcdLinea(0, "ENERGY SENTINEL");
@@ -417,7 +475,7 @@ void loop() {
   leerSerial();
 
   // 1) DETECTAR
-  pir = ahora > MS_CALENTAR_PIR && digitalRead(PIN_PIR) == HIGH;
+  pir = HAY_PIR && ahora > MS_CALENTAR_PIR && digitalRead(PIN_PIR) == HIGH;
   if (pir) { ultimoMovimiento = ahora; estado = 1; }
   else if (estado != 0) estado = (ahora - ultimoMovimiento < tiempoApagadoMs) ? 2 : 0;
   if (estado != estadoPrevio) {
@@ -431,9 +489,14 @@ void loop() {
 
   // 2) AUTOMATIZAR
   if (!manual) ponerLuces(estado != 0);
-  digitalWrite(PIN_LED_OCUPADA, estado == 1);
-  digitalWrite(PIN_LED_ESPERA,  estado == 2);
-  digitalWrite(PIN_LED_AHORRO,  !luces);
+  if (!ventManual) {
+    if (isnan(temperatura)) ponerVent(false);
+    else if (temperatura >= tempVent) ponerVent(true);
+    else if (temperatura <= tempVent - HISTERESIS) ponerVent(false);
+  }
+  digitalWrite(PIN_LED_OCUPADA, !vent && !sueloSecoDO);   // verde: todo normal
+  digitalWrite(PIN_LED_ESPERA,  vent);                    // amarillo: ventilador encendido
+  digitalWrite(PIN_LED_AHORRO,  sueloSecoDO);             // azul: tierra seca (regando)
 
   // 3) AHORRAR: medir uso y energia cada segundo
   if (ahora - ultimoTick >= 1000) {
@@ -442,6 +505,8 @@ void loop() {
     if (estado != 0) { usoSeg += s; activo = true; }
     if (luces) consumoWh += POTENCIA_W * s / 3600.0;
     if (activo) sinSistemaWh += POTENCIA_W * s / 3600.0;  // sin el sistema la luz quedaria encendida toda la jornada
+    if (vent) ventSeg += s;
+    leerSuelo();
   }
 
   if (ahora - ultimoDHT >= 3000) {
