@@ -134,7 +134,7 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
   <!-- MAQUETA -->
   <div class="card">
     <h2>Maqueta del aula <span class="der"><span id="modoFuente" class="pill">Simulación</span> &nbsp;<span id="reloj" style="font-family:var(--mono);color:var(--txt)">07:00</span></span></h2>
-    <svg class="aula" viewBox="0 0 800 470" role="img" aria-label="Maqueta del aula vista de frente: luces del techo, sensor PIR, pizarra, pupitres, ventilador, sensor DHT11, pantalla LCD, LEDs y Arduino">
+    <svg class="aula" viewBox="0 0 800 470" role="img" aria-label="Maqueta del aula vista de frente: luces del techo, sensor ultrasónico en la puerta, pizarra, pupitres, ventilador, sensor DHT11, pantalla LCD, LEDs y Arduino">
       <defs>
         <linearGradient id="cono" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7d6" stop-opacity=".75"/><stop offset="1" stop-color="#fff7d6" stop-opacity="0"/></linearGradient>
         <linearGradient id="pared" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef0f7"/><stop offset="1" stop-color="#d9dde9"/></linearGradient>
@@ -228,11 +228,15 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
 
       <!-- conos de luz y lámparas -->
       <g id="luces" clip-path="url(#interior)"></g>
-      <!-- sensor PIR en el techo -->
-      <path id="cono" d="M395 104 L250 416 H540 Z" fill="#45f0a0" opacity="0" style="transition:opacity .25s" clip-path="url(#interior)"/>
-      <rect x="388" y="88" width="14" height="5" fill="#cfd4de"/>
-      <path d="M383 93 a12 12 0 0 0 24 0 z" fill="#f4f5f8" stroke="#a3aab8"/>
-      <circle id="pirLed" cx="395" cy="99" r="2.6" fill="#555"/>
+      <!-- sensor ultrasónico HC-SR04 encima de la puerta -->
+      <path id="cono" d="M96 222 L84 408 L132 360 L118 222 Z" fill="#45f0a0" opacity="0" style="transition:opacity .25s"/>
+      <g aria-label="Sensor ultrasónico">
+        <rect x="84" y="203" width="44" height="18" rx="2" fill="#1f5fae" stroke="#123b70"/>
+        <circle cx="96" cy="212" r="6.5" fill="#cfd4de" stroke="#7d8696"/><circle cx="96" cy="212" r="3" fill="#3a4150"/>
+        <circle cx="116" cy="212" r="6.5" fill="#cfd4de" stroke="#7d8696"/><circle cx="116" cy="212" r="3" fill="#3a4150"/>
+        <circle id="pirLed" cx="106" cy="206" r="1.8" fill="#555"/>
+        <text x="106" y="198" text-anchor="middle" font-size="9" font-weight="700" fill="#1d2230" id="distSvg">HC-SR04</text>
+      </g>
 
       <!-- DHT11, pantalla LCD y LEDs (encima de la oscuridad: brillan) -->
       <g aria-label="Sensor DHT11">
@@ -331,6 +335,7 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
         <button class="btn" id="gNo" aria-pressed="false">🚫 No hay nadie</button>
         <button class="btn" id="gAuto" aria-pressed="true">📡 Que decida el sensor</button>
       </div>
+      <div class="fila"><span>El sensor detecta a menos de</span><input type="number" id="iDist" value="20" min="3" max="200" style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>cm</span><span style="color:var(--dim);font-size:12px">(solo con el Arduino real)</span></div>
       <div class="fila"><span>Potencia del aula real</span><input type="number" id="iPot" value="144" min="10" max="2000" style="width:80px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"> <span>W</span><span style="margin-left:auto">Tarifa</span><input type="number" id="iTar" value="0.21" step="0.01" min="0" style="width:70px;background:#0c1426;border:1px solid #2c3f66;border-radius:8px;color:var(--txt);padding:4px 6px"><span>$/kWh</span></div>
     </div>
 
@@ -392,7 +397,7 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
   <h3>Conexiones</h3>
   <table>
     <tr><th>Componente</th><th>Pines del módulo</th><th>Arduino</th><th>Notas</th></tr>
-    <tr><td>Sensor PIR HC-SR501</td><td>VCC / OUT / GND</td><td>5V / <b>D2</b> / GND</td><td>Detecta personas y enciende la luz del aula. Tarda ~30 s en activarse</td></tr>
+    <tr><td>Sensor ultrasónico HC-SR04 (en la puerta)</td><td>VCC / Trig / Echo / GND</td><td>5V / <b>D12</b> / <b>D2</b> / GND</td><td>Si algo pasa a menos de 20 cm, el aula queda ocupada y se encienden las luces</td></tr>
     <tr><td>Sensor DHT11 (temperatura y humedad)</td><td>VCC / DATA / GND</td><td>5V / <b>D4</b> / GND</td><td>Controla el ventilador</td></tr>
     <tr><td>Módulo relé 5 V (ventilador)</td><td>VCC / GND / IN</td><td>5V / GND / <b>D7</b></td><td>COM → 5V, NO → ventilador (+); ventilador (−) → GND</td></tr>
     <tr><td>Luz 1 del aula (LED blanco)</td><td>+ / −</td><td><b>D6</b> / GND</td><td>Resistencia de 330 Ω (cada luz con la suya)</td></tr>
@@ -414,9 +419,9 @@ footer{margin-top:24px;color:var(--mut);font-size:12px;text-align:center}
   <p style="text-align:center;max-width:none;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn" href="logo/logo-completo.png" download>⬇ Descargar logo (PNG)</a> <a class="btn" href="logo/logo-icono.png" download>⬇ Descargar ícono (PNG)</a></p>
   <h2>Cómo funciona</h2>
   <h3>1 · Detectar</h3>
-  <p>El sensor de movimiento PIR vigila el aula. Cuando alguien entra, envía la señal al Arduino UNO R4 WiFi, que es el cerebro del sistema. El sensor DHT11 mide la temperatura.</p>
+  <p>El sensor ultrasónico HC-SR04 está en la puerta y mide la distancia con sonido. Cuando alguien pasa a menos de 20 cm, avisa al Arduino UNO R4 WiFi, que es el cerebro del sistema. El sensor DHT11 mide la temperatura.</p>
   <h3>2 · Automatizar</h3>
-  <p>Con presencia, el Arduino enciende las luces LED del techo. Cuando el aula queda vacía empieza un temporizador (LED amarillo y cuenta atrás en la pantalla LCD). Si se cumple el tiempo sin detectar a nadie, el sistema entra en <b>modo ahorro</b> y apaga las luces (LED azul).</p>
+  <p>Con presencia, el Arduino enciende las luces LED del techo. Cuando nadie pasa por la puerta empieza un temporizador (cuenta atrás en la pantalla LCD). Si se cumple el tiempo sin detectar a nadie, el sistema entra en <b>modo ahorro</b>, apaga las luces y se enciende el LED rojo.</p>
   <h3>3 · Ahorrar</h3>
   <p>El Arduino cuenta cuánto tiempo estuvieron encendidas las luces y lo compara con un aula sin el sistema, donde las luces quedan prendidas toda la jornada. La jornada empieza cuando entra la primera persona. Así calcula la energía y el dinero ahorrados.</p>
   <h3>IoT</h3>
@@ -548,7 +553,7 @@ function paso(dt){
   else if (S.estado !== 'VACIA') S.estado = (S.t - S.ultMov < S.tiempo) ? 'ESPERA' : 'VACIA';
   S.restante = S.estado === 'ESPERA' ? Math.ceil(S.tiempo - (S.t - S.ultMov)) : 0;
   if (antes !== S.estado) {
-    if (S.estado === 'OCUPADA') log('PIR detecta presencia → aula <b>ocupada</b>');
+    if (S.estado === 'OCUPADA') log('El sensor ultrasónico detecta a alguien → aula <b>ocupada</b>');
     if (S.estado === 'ESPERA') log('Aula vacía → temporizador de '+S.tiempo+' s');
     if (S.estado === 'VACIA') log('Tiempo cumplido → <b>modo ahorro</b>');
   }
@@ -653,11 +658,12 @@ function pintar(){
   const [l1, l2] = lcdVer(lcdTexto()).split('\n'); $('lcdL1').textContent = l1; $('lcdL2').textContent = l2 || '';
   $('reloj').textContent = S.fuente==='sim' ? fmtHora(S.t) : new Date().toLocaleTimeString('es-PA',{hour:'2-digit',minute:'2-digit'});
   $('tSvg').textContent = S.temp==null ? '--' : S.temp.toFixed(1)+' °C';
+  $('distSvg').textContent = S.fuente!=='sim' && S.dist!=null ? S.dist+' cm' : 'HC-SR04';
 
   const kE = $('kEstado');
   kE.textContent = {OCUPADA:'OCUPADA',ESPERA:'EN ESPERA',VACIA:'DESOCUPADA'}[S.estado];
   kE.className = 'v estado-'+S.estado.toLowerCase();
-  $('kPersonas').textContent = S.fuente==='sim' ? (S.personas.length+(S.personas.length===1?' persona':' personas')) + (S.estado==='ESPERA'?' · apaga en '+S.restante+' s':'') : (S.estado==='ESPERA'?'apaga en '+S.restante+' s':'sensor PIR');
+  $('kPersonas').textContent = S.fuente==='sim' ? (S.personas.length+(S.personas.length===1?' persona':' personas')) + (S.estado==='ESPERA'?' · apaga en '+S.restante+' s':'') : (S.estado==='ESPERA'?'apaga en '+S.restante+' s':'sensor ultrasónico') + (S.dist!=null ? ' · '+S.dist+' cm' : '');
   $('kLuces').textContent = on ? (nLamp()<4 ? nLamp()+' DE 4' : 'ENCENDIDAS') : 'APAGADAS';
   $('kLuces').style.color = on ? 'var(--ambar)' : 'var(--azul)';
   $('kModo').textContent = S.manual ? 'Control manual (remoto)' : 'Modo automático';
@@ -743,6 +749,7 @@ function luzSola(i){
 }
 document.querySelectorAll('.lamps .btn').forEach(b=>b.onclick=()=>luzSola(+b.dataset.l));
 gL.querySelectorAll('.lampara').forEach((g,i)=>g.addEventListener('click',()=>luzSola(i)));
+$('iDist').onchange = () => { const v = Math.max(3, Math.min(200, +$('iDist').value || 20)); $('iDist').value = v; if (S.fuente !== 'sim') { enviar('DISTANCIA '+v); log('Orden enviada al Arduino: detectar a menos de <b>'+v+' cm</b>'); } };
 function presencia(v){
   if (S.fuente !== 'sim') { S.gente = v; enviar(v===1?'GENTE_SI':v===0?'GENTE_NO':'GENTE_AUTO'); log('Orden enviada al Arduino: <b>'+(v===1?'hay alguien':v===0?'no hay nadie':'decide el sensor')+'</b>'); pintar(); return; }
   if (S.dia !== null) pararDia(false);
@@ -934,6 +941,8 @@ function recibir(d){
   S.temp = typeof d.temp === 'number' ? d.temp : null;
   S.hum = typeof d.hum === 'number' ? d.hum : null;
   if (d.lcd1 != null) { S.lcd1 = d.lcd1; S.lcd2 = d.lcd2; }
+  S.dist = typeof d.dist === 'number' ? d.dist : null;
+  if (d.dist_max && document.activeElement !== $('iDist')) $('iDist').value = d.dist_max;
   S.restante = d.restante|0; S.uso = d.usoSeg||0; S.consWh = d.consumoWh||0; S.sinWh = d.sinSistemaWh||0;
   if (d.potencia) S.pot = d.potencia;
   if (d.tiempo && document.activeElement !== $('rTiempo')) { S.tiempo = d.tiempo; $('rTiempo').value = d.tiempo; $('oTiempo').textContent = d.tiempo+' s'; }

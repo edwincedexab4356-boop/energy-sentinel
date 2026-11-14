@@ -9,7 +9,8 @@
   La matriz de LEDs de la placa (Arduino_LED_Matrix) ya viene con la placa.
 
   CONEXIONES
-    Sensor PIR HC-SR501          VCC -> 5V   OUT -> D2    GND -> GND
+    Sensor ultrasonico HC-SR04   VCC -> 5V   Trig -> D12  Echo -> D2   GND -> GND
+      (en la puerta: si algo pasa a menos de 20 cm, el aula queda ocupada)
     Sensor DHT11 (temp/humedad)  VCC -> 5V   DATA -> D4   GND -> GND
     Modulo rele 5 V              VCC -> 5V   GND -> GND   IN -> D7
       (ventilador 5 V)           COM -> 5V   NO -> ventilador (+) ; ventilador (-) -> GND
@@ -39,7 +40,8 @@
     LUZ_ON | LUZ_OFF | AUTO | TIEMPO <seg> | POTENCIA <W> | REINICIAR | ESTADO
     LUZ1_ON .. LUZ4_ON | LUZ1_OFF .. LUZ4_OFF   (una luz sola; tambien "LUZ 2 ON")
     VENT_ON | VENT_OFF | VENT_AUTO | TEMP_VENT <C>
-    GENTE_SI (hay alguien) | GENTE_NO (no hay nadie) | GENTE_AUTO (decide el PIR)
+    GENTE_SI (hay alguien) | GENTE_NO (no hay nadie) | GENTE_AUTO (decide el sensor)
+    DISTANCIA <cm>  (desde que distancia cuenta como "hay alguien", 3-200)
     BUZZER_ON | BUZZER_OFF (silenciar) | PITAR (prueba)
 */
 
@@ -71,7 +73,8 @@ const char BROKER[] = "broker.hivemq.com";       // servidor MQTT gratuito
 const int  PUERTO   = 1883;
 
 // ================== PINES ==================
-const uint8_t PIN_PIR         = 2;
+const uint8_t PIN_ECHO        = 2;    // ultrasonico: Echo
+const uint8_t PIN_TRIG        = 12;   // ultrasonico: Trig
 const uint8_t PIN_DHT         = 4;
 const uint8_t PIN_LUZ[4]      = {6, 3, 5, 11};   // las 4 luces del aula (pines PWM: se encienden suave)
 const uint8_t PIN_LED_OCUPADA = 8;   // verde: aula ocupada (luces encendidas)
@@ -84,14 +87,15 @@ const uint8_t PIN_BUZZER      = A0;   // buzzer
 // true  = Bluetooth (BLE) + USB.   false = WiFi / internet (MQTT) + USB.
 const bool MODO_BLUETOOTH = true;
 const char BLE_NOMBRE[] = "EnergySentinel";
-const bool HAY_PIR = true;
+const bool HAY_PIR = true;            // true = hay sensor de presencia (ultrasonico)
 // Logica del rele: true = se activa con HIGH. Si el ventilador funciona al reves, pon false.
 const bool RELE_ACTIVO_ALTO = true;
 
 // ================== AJUSTES ==================
 float POTENCIA_W = 144.0;                  // aula real equivalente: 8 lamparas LED de 18 W
 unsigned long tiempoApagadoMs = 30000UL;   // tiempo sin presencia antes de apagar
-const unsigned long MS_CALENTAR_PIR = HAY_PIR ? 30000UL : 0;  // el PIR tarda ~30 s en estabilizarse
+const unsigned long MS_CALENTAR_PIR = 0;   // el ultrasonico funciona al instante (el PIR tardaba 30 s)
+float distMax = 20.0;                      // cm: algo mas cerca que esto = hay alguien
 float tempVent = 28.0;                     // el ventilador se enciende desde esta temperatura
 const float HISTERESIS = 1.5;              // y se apaga 1.5 C por debajo
 
@@ -106,7 +110,8 @@ float temperatura = NAN, humedad = NAN;
 unsigned long ultimoMovimiento = 0, ultimoTick = 0;
 double usoSeg = 0, consumoWh = 0, sinSistemaWh = 0;
 bool vent = false, ventManual = false, bleConectado = false;
-int gente = -1;   // -1 = decide el sensor PIR, 1 = hay alguien, 0 = no hay nadie (desde la pagina)
+float distancia = NAN;   // cm medidos por el ultrasonico (NAN = nada enfrente)
+int gente = -1;   // -1 = decide el sensor, 1 = hay alguien, 0 = no hay nadie (desde la pagina)
 double ventSeg = 0;
 
 WiFiServer servidor(80);
@@ -201,6 +206,26 @@ void ponerVent(bool on) {
   digitalWrite(PIN_RELE_VENT, (on == RELE_ACTIVO_ALTO) ? HIGH : LOW);
   if (!on) sonar(SON_VENT_OFF, 3);             // se apago el ventilador
   evento(String("Ventilador ") + (on ? "encendido" : "apagado") + (ventManual ? " (manual)" : " (automatico)"));
+}
+
+// ================== ULTRASONICO HC-SR04 ==================
+// Mide cada 80 ms. Hacen falta 2 lecturas seguidas cerca para contar presencia (evita falsos).
+unsigned long ultimaMedida = 0;
+uint8_t cercaSeguidas = 0;
+bool presenciaUltra = false;
+
+void medirDistancia() {
+  unsigned long ahora = millis();
+  if (ahora - ultimaMedida < 80) return;
+  ultimaMedida = ahora;
+  digitalWrite(PIN_TRIG, LOW);  delayMicroseconds(3);
+  digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  unsigned long us = pulseIn(PIN_ECHO, HIGH, 15000UL);   // maximo ~2.5 m
+  distancia = us ? us / 58.0 : NAN;
+  bool cerca = !isnan(distancia) && distancia >= 2 && distancia <= distMax;
+  cercaSeguidas = cerca ? min(cercaSeguidas + 1, 5) : 0;
+  presenciaUltra = cercaSeguidas >= 2;
 }
 
 // ================== DHT11 (sin libreria) ==================
@@ -321,7 +346,7 @@ void actualizarLCD() {
   if (ahora < MS_CALENTAR_PIR) {   // barra de carga mientras el PIR se prepara
     lcdLinea(0, "ENERGY SENTINEL");
     int n = map(ahora, 0, MS_CALENTAR_PIR, 0, 12);
-    String barra = "PIR ";
+    String barra = "SENS";
     for (int i = 0; i < 12; i++) barra += (char)(i < n ? 0xFF : '.');
     lcdLinea(1, barra);
     return;
@@ -423,10 +448,15 @@ String ejecutar(String cmd) {
   if (up == "ESTADO") return "OK";
   if (up == "GENTE_SI")   { gente = 1;  evento("Orden: hay alguien en el aula"); return "OK"; }
   if (up == "GENTE_NO")   { gente = 0;  estado = 0; evento("Orden: no hay nadie en el aula"); return "OK"; }
-  if (up == "GENTE_AUTO") { gente = -1; evento("Orden: la presencia la decide el sensor PIR"); return "OK"; }
+  if (up == "GENTE_AUTO") { gente = -1; evento("Orden: la presencia la decide el sensor ultrasonico"); return "OK"; }
   if (up == "BUZZER_ON")  { buzzerOn = true;  evento("Buzzer activado"); sonar(SON_PRUEBA, 5); return "OK"; }
   if (up == "BUZZER_OFF") { buzzerOn = false; colaN = colaI = 0; noTone(PIN_BUZZER); evento("Buzzer silenciado"); return "OK"; }
   if (up == "PITAR")      { sonar(SON_PRUEBA, 5); return "OK"; }
+  if (up.startsWith("DISTANCIA")) {
+    float d = up.substring(9).toFloat();
+    if (d < 3 || d > 200) return "ERROR distancia 3-200 cm";
+    distMax = d; evento("Detecta presencia a menos de " + String(d, 0) + " cm"); return "OK";
+  }
   if (up == "VENT_ON")   { ventManual = true; ponerVent(true);  return "OK"; }
   if (up == "VENT_OFF")  { ventManual = true; ponerVent(false); return "OK"; }
   if (up == "VENT_AUTO") { ventManual = false; evento("Ventilador en automatico (desde " + String(tempVent, 1) + " C)"); return "OK"; }
@@ -460,6 +490,9 @@ String jsonEstado() {
   j += ",\"red\":\"" + String(modoAP ? AP_NOMBRE : (wifiOk ? SECRET_SSID : "")) + "\"";
   j += ",\"mqtt\":" + String(mqtt.connected() ? 1 : 0);
   j += ",\"hay_pir\":" + String(HAY_PIR ? 1 : 0);
+  j += ",\"sensor\":\"ultrasonico\"";
+  j += ",\"dist\":" + (isnan(distancia) ? String("null") : String(distancia, 0));
+  j += ",\"dist_max\":" + String(distMax, 0);
   j += ",\"vent\":" + String(vent ? 1 : 0);
   j += ",\"vent_modo\":\"" + String(ventManual ? "MANUAL" : "AUTO") + "\"";
   j += ",\"temp_vent\":" + String(tempVent, 1);
@@ -665,7 +698,9 @@ void iniciarWiFi() {
 // ================== SETUP / LOOP ==================
 void setup() {
   Serial.begin(115200);
-  pinMode(PIN_PIR, INPUT);
+  pinMode(PIN_ECHO, INPUT);
+  pinMode(PIN_TRIG, OUTPUT);
+  digitalWrite(PIN_TRIG, LOW);
   pinMode(PIN_DHT, INPUT_PULLUP);
   for (int i = 0; i < 4; i++) { pinMode(PIN_LUZ[i], OUTPUT); analogWrite(PIN_LUZ[i], 0); }
   pinMode(PIN_LED_OCUPADA, OUTPUT);
@@ -701,14 +736,15 @@ void loop() {
   leerSerial();
 
   // 1) DETECTAR
-  pir = HAY_PIR && ahora > MS_CALENTAR_PIR && digitalRead(PIN_PIR) == HIGH;
+  if (HAY_PIR) medirDistancia();
+  pir = HAY_PIR && presenciaUltra;
   if (gente == 1) pir = true;    // la pagina dice que hay alguien
   if (gente == 0) pir = false;   // la pagina dice que no hay nadie
   if (pir) { ultimoMovimiento = ahora; estado = 1; }
   else if (estado != 0) estado = (ahora - ultimoMovimiento < tiempoApagadoMs) ? 2 : 0;
   if (estado != estadoPrevio) {
     if (estadoPrevio >= 0) {
-      if (estado == 1) evento("PIR detecta presencia: aula ocupada");
+      if (estado == 1) evento("Sensor ultrasonico detecta a alguien (" + String(distancia, 0) + " cm): aula ocupada");
       if (estado == 2) evento("Aula vacia: temporizador de " + String(tiempoApagadoMs / 1000) + " s");
       if (estado == 0) evento("Tiempo cumplido: modo ahorro");
     }

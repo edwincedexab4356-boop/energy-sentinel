@@ -15,7 +15,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 
 | Estado | Qué pasa | LEDs | Pantalla LCD |
 |---|---|---|---|
-| OCUPADA | El PIR detecta presencia: luces encendidas | verde | `AULA:OCUPADA AUT` / `LUZ:ON T:27.5C` |
+| OCUPADA | El sensor ultrasónico detecta a alguien: luces encendidas | verde | `AULA:OCUPADA AUT` / `LUZ:ON T:27.5C` |
 | ESPERA | Nadie se mueve: cuenta atrás (30 s por defecto) | amarillo | `APAGA EN  12s` |
 | VACIA | Se cumplió el tiempo: luces apagadas | azul | `MODO AHORRO` |
 
@@ -23,7 +23,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 
 | Componente | Pines del módulo | Arduino UNO R4 WiFi |
 |---|---|---|
-| Sensor PIR HC-SR501 | VCC / OUT / GND | 5V / **D2** / GND |
+| Sensor ultrasónico HC-SR04 (en la puerta) | VCC / Trig / Echo / GND | 5V / **D12** / **D2** / GND |
 | Sensor DHT11 (temperatura y humedad) | VCC / DATA / GND | 5V / **D4** / GND |
 | Módulo relé 5 V → ventilador 5 V | VCC / GND / IN | 5V / GND / **D7** |
 | Luz 1 del aula (LED blanco) | + / − | **D6** (con 330 Ω) / GND |
@@ -36,7 +36,7 @@ mide la temperatura y calcula cuánta energía y dinero ahorra. Se controla desd
 | Buzzer | + / − | **A0** / GND (pita al encender las luces y al apagar el ventilador) |
 | LCD 16x2 I2C | VCC / GND / SDA / SCL | 5V / GND / **SDA** / **SCL** |
 
-- El PIR detecta a alguien → se enciende la luz del aula. Sin movimiento durante 30 s → se apaga.
+- El sensor ultrasónico de la puerta detecta a alguien a menos de 20 cm → se encienden las luces. Si nadie pasa en 30 s → se apagan.
 - Ventilador: COM del relé → 5V; NO → ventilador (+); ventilador (−) → GND.
   Se enciende solo si hay alguien y hace 28 °C o más (se cambia en la página); se apaga 1.5 °C por debajo o si el aula queda vacía.
 - Si el ventilador funciona al revés, cambia `RELE_ACTIVO_ALTO` a `false`.
@@ -61,6 +61,6 @@ para volver a WiFi/internet pon `MODO_BLUETOOTH = false`.
 
 `LUZ1_ON` … `LUZ4_ON` · `LUZ1_OFF` … `LUZ4_OFF` (una luz sola)
 
-`VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28` · `GENTE_SI` · `GENTE_NO` · `GENTE_AUTO`
+`VENT_ON` · `VENT_OFF` · `VENT_AUTO` · `TEMP_VENT 28` · `GENTE_SI` · `GENTE_NO` · `GENTE_AUTO` · `DISTANCIA 20`
 
 `BUZZER_ON` · `BUZZER_OFF` (silenciar) · `PITAR` (prueba)
